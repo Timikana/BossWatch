@@ -1,0 +1,15 @@
+package-as: BossWatch
+
+curse-project-id: 1535856
+
+move-folders:
+  BossWatch: BossWatch
+
+ignore:
+  - .gitignore
+  - .github
+  - README.md
+  - LICENSE
+  - logo.png
+  - CLAUDE.md
+  - .pkgmeta
