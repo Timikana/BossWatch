@@ -6,6 +6,7 @@
 ## IconTexture: Interface\Icons\Achievement_Boss_Argaloth
 ## SavedVariables: BossWatchDB
 ## AllowAddOnTableAccess: 1
+## X-Curse-Project-ID: 1535856
 
 # Libs
 Libs\LibStub\LibStub.lua
