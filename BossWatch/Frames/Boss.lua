@@ -419,6 +419,7 @@ BW.ApplyLayout = ApplyLayout
 local function RefreshAll()
     if not BW.BossContainer then return end
     ApplyLayout()
+    if BW.ApplyFonts then BW:ApplyFonts() end
     for i = 1, MAX_BOSS do
         local f = BW.BossFrames[i]
         if f then UpdateFrame(f) end
