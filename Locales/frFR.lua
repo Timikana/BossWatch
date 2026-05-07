@@ -13,7 +13,31 @@ L["Cast Bar"]    = "Incantation"
 L["Text"]        = "Texte"
 L["Raid Marker"] = "Marqueur"
 L["Auras"]       = "Auras"
+L["Profiles"]    = "Profils"
 L["About"]       = "À propos"
+
+-- ============================================================
+-- PROFILES PAGE
+-- ============================================================
+L["Active profile"]                              = "Profil actif"
+L["Character:"]                                  = "Personnage :"
+L["New..."]                                      = "Nouveau..."
+L["Reset"]                                       = "Réinitialiser"
+L["Delete"]                                      = "Supprimer"
+L["Name of the new profile (copies current settings):"] = "Nom du nouveau profil (copie les réglages actuels) :"
+L["Name for the imported profile:"]              = "Nom du profil à importer :"
+L["Reset profile '%s' to defaults?"]             = "Réinitialiser le profil '%s' aux valeurs par défaut ?"
+L["Delete profile '%s'?"]                        = "Supprimer le profil '%s' ?"
+L["cannot delete Default"]                       = "impossible de supprimer Default"
+L["profile '%s' created"]                        = "profil '%s' créé"
+L["profile '%s' imported"]                       = "profil '%s' importé"
+L["import failed:"]                              = "échec de l'import :"
+L["import box is empty"]                         = "la zone d'import est vide"
+L["Export"]                                      = "Exporter"
+L["Import"]                                      = "Importer"
+L["Refresh export"]                              = "Rafraîchir l'export"
+L["Select all"]                                  = "Tout sélectionner"
+L["Import as new profile..."]                    = "Importer comme nouveau profil..."
 
 -- ============================================================
 -- WINDOW
@@ -28,6 +52,9 @@ L["Test:"]               = "Test :"
 L["Off"]                 = "Off"
 L["Enable"]              = "Activé"
 L["Hide Blizzard"]       = "Cacher Blizzard"
+L["Show minimap icon"]   = "Afficher l'icône minicarte"
+L["left-click: options"] = "clic gauche : options"
+L["right-click: toggle mover"] = "clic droit : afficher / cacher le mover"
 L["Anchor"]              = "Ancrage"
 L["Grow Direction"]      = "Direction"
 L["Down"]                = "Bas"
@@ -64,8 +91,17 @@ L["Health Color"]            = "Couleur de la vie"
 L["Reaction (Blizzard)"]     = "Réaction (Blizzard)"
 L["Class fallback"]          = "Couleur de classe"
 L["Custom static"]           = "Personnalisée"
+L["Static color"]            = "Couleur statique"
+L["Click to choose a color"] = "Cliquer pour choisir une couleur"
 L["HP background alpha"]     = "Alpha fond vie"
 L["Power background alpha"]  = "Alpha fond ressource"
+
+-- Target Highlight
+L["Target Highlight"]         = "Surbrillance de la cible"
+L["Highlight current target"] = "Surligner la cible actuelle"
+L["Animate (pulse)"]          = "Animer (pulsation)"
+L["Border color"]             = "Couleur de la bordure"
+L["Border thickness"]         = "Épaisseur de la bordure"
 
 -- ============================================================
 -- CAST BAR PAGE

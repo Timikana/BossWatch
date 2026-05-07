@@ -54,6 +54,12 @@ BW.Defaults = {
     showPowerText = true, powerTextAnchor = "RIGHT", powerTextX = -2, powerTextY = 0,
     powerTextFormat = "PERCENT",
 
+    -- Target highlight
+    targetHighlight = true,
+    targetHighlightColor = { r = 1, g = 0.82, b = 0, a = 1 }, -- gold
+    targetHighlightAnimate = true,
+    targetHighlightThickness = 2,
+
     -- Raid target icon
     showRaidTargetIcon = true, raidTargetAnchor = "TOP",
     raidTargetX = 0, raidTargetY = 4, raidTargetSize = 18, raidTargetAlpha = 0.9,
@@ -85,20 +91,205 @@ local function seedDefaults(target)
     end
 end
 
-function BW:GetDB()
-    BossWatchDB = BossWatchDB or {}
-    -- Migrate legacy broken default (pointed to a Media file that never shipped)
-    if BossWatchDB.healthTexture == "Interface\\AddOns\\BossWatch\\Media\\bar.tga" then
-        BossWatchDB.healthTexture = "Blizzard Raid Bar"
+-- ============================================================
+-- PROFILES
+-- ============================================================
+
+function BW:GetCharKey()
+    local name = UnitName("player") or "?"
+    local realm = GetRealmName() or "?"
+    return name .. " - " .. realm
+end
+
+local function migrateLegacyTextures(p)
+    if p.healthTexture == "Interface\\AddOns\\BossWatch\\Media\\bar.tga" then
+        p.healthTexture = "Blizzard Raid Bar"
     end
-    -- Migrate previous default ("Blizzard" classic) → modern "Blizzard Raid Bar"
-    if BossWatchDB.healthTexture == "Blizzard" then BossWatchDB.healthTexture = "Blizzard Raid Bar" end
-    if BossWatchDB.powerTexture  == "Blizzard" then BossWatchDB.powerTexture  = "Blizzard Raid Bar" end
-    if BossWatchDB.castTexture   == "Blizzard" then BossWatchDB.castTexture   = "Blizzard Modern" end
-    -- Switch the previous cast default to the new modern one
-    if BossWatchDB.castTexture   == "Blizzard Raid Bar" then BossWatchDB.castTexture = "Blizzard Modern" end
-    seedDefaults(BossWatchDB)
-    return BossWatchDB
+    if p.healthTexture == "Blizzard" then p.healthTexture = "Blizzard Raid Bar" end
+    if p.powerTexture  == "Blizzard" then p.powerTexture  = "Blizzard Raid Bar" end
+    if p.castTexture   == "Blizzard" then p.castTexture   = "Blizzard Modern" end
+    if p.castTexture   == "Blizzard Raid Bar" then p.castTexture = "Blizzard Modern" end
+end
+
+local function ensureProfilesDB()
+    BossWatchDB = BossWatchDB or {}
+    -- Migrate flat → profile structure (one-shot)
+    if not BossWatchDB.profiles then
+        local old = {}
+        for k, v in pairs(BossWatchDB) do
+            if k ~= "profiles" and k ~= "charBindings" and k ~= "version" and k ~= "minimap" then
+                old[k] = v
+                BossWatchDB[k] = nil
+            end
+        end
+        BossWatchDB.profiles = { Default = old }
+        BossWatchDB.charBindings = {}
+        BossWatchDB.version = 1
+    end
+    BossWatchDB.profiles = BossWatchDB.profiles or {}
+    if not BossWatchDB.profiles.Default then BossWatchDB.profiles.Default = {} end
+    BossWatchDB.charBindings = BossWatchDB.charBindings or {}
+    -- Account-wide minimap state (NOT per-profile)
+    BossWatchDB.minimap = BossWatchDB.minimap or { hide = true }
+end
+
+function BW:GetActiveProfileName()
+    ensureProfilesDB()
+    local key = BW:GetCharKey()
+    local n = BossWatchDB.charBindings[key]
+    if n and BossWatchDB.profiles[n] then return n end
+    BossWatchDB.charBindings[key] = "Default"
+    return "Default"
+end
+
+function BW:GetDB()
+    ensureProfilesDB()
+    local name = BW:GetActiveProfileName()
+    local p = BossWatchDB.profiles[name]
+    migrateLegacyTextures(p)
+    seedDefaults(p)
+    return p
+end
+
+function BW:SetActiveProfile(name)
+    ensureProfilesDB()
+    if not BossWatchDB.profiles[name] then return false end
+    BossWatchDB.charBindings[BW:GetCharKey()] = name
+    if BW.RefreshAll then BW:RefreshAll() end
+    if BW.ApplyFonts then BW:ApplyFonts() end
+    return true
+end
+
+local function deepCopy(t)
+    if type(t) ~= "table" then return t end
+    local c = {}
+    for k, v in pairs(t) do c[k] = deepCopy(v) end
+    return c
+end
+
+function BW:CreateProfile(newName, copyFromName)
+    ensureProfilesDB()
+    if not newName or newName == "" or BossWatchDB.profiles[newName] then return false end
+    local source = BossWatchDB.profiles[copyFromName or BW:GetActiveProfileName()]
+    BossWatchDB.profiles[newName] = source and deepCopy(source) or {}
+    return true
+end
+
+function BW:ResetProfile(name)
+    ensureProfilesDB()
+    if not BossWatchDB.profiles[name] then return false end
+    BossWatchDB.profiles[name] = {}
+    return true
+end
+
+function BW:DeleteProfile(name)
+    ensureProfilesDB()
+    if name == "Default" then return false, "cannot delete Default" end
+    if not BossWatchDB.profiles[name] then return false end
+    BossWatchDB.profiles[name] = nil
+    for k, v in pairs(BossWatchDB.charBindings) do
+        if v == name then BossWatchDB.charBindings[k] = "Default" end
+    end
+    return true
+end
+
+function BW:ListProfiles()
+    ensureProfilesDB()
+    local list = {}
+    for n in pairs(BossWatchDB.profiles) do list[#list + 1] = n end
+    table.sort(list, function(a, b)
+        if a == "Default" then return true end
+        if b == "Default" then return false end
+        return a:lower() < b:lower()
+    end)
+    return list
+end
+
+-- ============================================================
+-- BASE64 + SERIALIZE (for Export / Import)
+-- ============================================================
+local B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+
+local function b64encode(data)
+    return ((data:gsub('.', function(x)
+        local r, b = '', x:byte()
+        for i = 8, 1, -1 do r = r .. (b % 2 ^ i - b % 2 ^ (i - 1) > 0 and '1' or '0') end
+        return r
+    end) .. '0000'):gsub('%d%d%d?%d?%d?%d?', function(x)
+        if (#x < 6) then return '' end
+        local c = 0
+        for i = 1, 6 do c = c + (x:sub(i, i) == '1' and 2 ^ (6 - i) or 0) end
+        return B64:sub(c + 1, c + 1)
+    end) .. ({ '', '==', '=' })[#data % 3 + 1])
+end
+
+local function b64decode(data)
+    data = string.gsub(data, '[^' .. B64 .. '=]', '')
+    return (data:gsub('.', function(x)
+        if (x == '=') then return '' end
+        local r, f = '', (B64:find(x) - 1)
+        for i = 6, 1, -1 do r = r .. (f % 2 ^ i - f % 2 ^ (i - 1) > 0 and '1' or '0') end
+        return r
+    end):gsub('%d%d%d?%d?%d?%d?%d?%d?', function(x)
+        if (#x ~= 8) then return '' end
+        local c = 0
+        for i = 1, 8 do c = c + (x:sub(i, i) == '1' and 2 ^ (8 - i) or 0) end
+        return string.char(c)
+    end))
+end
+
+local function serialize(t, indent)
+    indent = indent or ""
+    local typ = type(t)
+    if typ == "string" then return string.format("%q", t) end
+    if typ == "number" or typ == "boolean" then return tostring(t) end
+    if typ ~= "table" then return "nil" end
+    local parts = { "{\n" }
+    local nextIndent = indent .. "  "
+    local keys = {}
+    for k in pairs(t) do keys[#keys + 1] = k end
+    table.sort(keys, function(a, b) return tostring(a) < tostring(b) end)
+    for _, k in ipairs(keys) do
+        local v = t[k]
+        local key
+        if type(k) == "string" and k:match("^[%a_][%w_]*$") then
+            key = k
+        elseif type(k) == "string" then
+            key = "[" .. string.format("%q", k) .. "]"
+        else
+            key = "[" .. tostring(k) .. "]"
+        end
+        parts[#parts + 1] = nextIndent .. key .. " = " .. serialize(v, nextIndent) .. ",\n"
+    end
+    parts[#parts + 1] = indent .. "}"
+    return table.concat(parts)
+end
+
+function BW:ExportProfile(name)
+    ensureProfilesDB()
+    local p = BossWatchDB.profiles[name or BW:GetActiveProfileName()]
+    if not p then return nil end
+    local body = "return " .. serialize(p)
+    return "BW1:" .. b64encode(body)
+end
+
+function BW:ImportProfile(text, newName)
+    if not text or text == "" then return false, "import box is empty" end
+    text = text:gsub("^%s+", ""):gsub("%s+$", "")
+    if text:sub(1, 4) ~= "BW1:" then return false, "invalid format" end
+    local body = b64decode(text:sub(5))
+    if not body or body == "" then return false, "decode failed" end
+    local fn, err = (loadstring or load)(body, "import", "t", {})
+    if not fn then return false, tostring(err) end
+    setfenv = setfenv or function() end
+    pcall(setfenv, fn, {})
+    local ok, profile = pcall(fn)
+    if not ok or type(profile) ~= "table" then return false, "invalid table" end
+    if not newName or newName == "" then return false, "missing name" end
+    ensureProfilesDB()
+    if BossWatchDB.profiles[newName] then return false, "profile already exists" end
+    BossWatchDB.profiles[newName] = profile
+    return true
 end
 
 -- ============================================================
@@ -234,10 +425,47 @@ end
 -- ============================================================
 local init = CreateFrame("Frame")
 init:RegisterEvent("PLAYER_LOGIN")
+function BW:RegisterMinimapIcon()
+    if BW._minimapRegistered then return end
+    local LDB = LibStub and LibStub("LibDataBroker-1.1", true)
+    local Icon = LibStub and LibStub("LibDBIcon-1.0", true)
+    if not LDB or not Icon then return end
+
+    local broker = LDB:NewDataObject("BossWatch", {
+        type = "launcher",
+        text = "BossWatch",
+        icon = "Interface\\AddOns\\BossWatch\\Media\\minimap.png",
+        OnClick = function(_, button)
+            if button == "RightButton" then
+                if BW.ToggleMover then BW:ToggleMover() end
+            else
+                if BW.ToggleOptions then BW:ToggleOptions() end
+            end
+        end,
+        OnTooltipShow = function(tip)
+            tip:AddLine("|cffeda55fBossWatch|r")
+            tip:AddLine("|cffaaaaaa" .. (BW.L["left-click: options"] or "left-click: options") .. "|r")
+            tip:AddLine("|cffaaaaaa" .. (BW.L["right-click: toggle mover"] or "right-click: toggle mover") .. "|r")
+        end,
+    })
+    Icon:Register("BossWatch", broker, BossWatchDB.minimap)
+    BW._minimapRegistered = true
+end
+
+function BW:ToggleMinimapIcon(show)
+    BossWatchDB.minimap = BossWatchDB.minimap or { hide = true }
+    BossWatchDB.minimap.hide = not show
+    local Icon = LibStub and LibStub("LibDBIcon-1.0", true)
+    if Icon then
+        if show then Icon:Show("BossWatch") else Icon:Hide("BossWatch") end
+    end
+end
+
 init:SetScript("OnEvent", function()
     BW:GetDB()
     if BW.EnsureCreated then BW:EnsureCreated() end
     if BW.ApplyFonts then BW:ApplyFonts() end
+    if BW.RegisterMinimapIcon then BW:RegisterMinimapIcon() end
     if BW.RegisterBlizzardSettings then BW:RegisterBlizzardSettings() end
     print(format(BW.L["|cffeda55fBossWatch|r v%s loaded — type |cffffff00/bw|r for options"],
         C_AddOns and C_AddOns.GetAddOnMetadata(addonName, "Version") or "?"))

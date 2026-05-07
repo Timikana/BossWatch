@@ -288,6 +288,116 @@ local function makeMediaDropdown(parent, label, key, mediaType, x, y, width)
     return btn
 end
 
+local function makeColorPicker(parent, label, dbKey, x, y)
+    local lab
+    if label and label ~= "" then
+        lab = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        lab:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y)
+        lab:SetText(label)
+    end
+
+    local btn = CreateFrame("Button", nil, parent, "BackdropTemplate")
+    btn:SetSize(80, 22)
+    if lab then
+        btn:SetPoint("TOPLEFT", lab, "BOTTOMLEFT", 0, -2)
+    else
+        btn:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y)
+    end
+    btn:RegisterForClicks("AnyUp")
+    btn:SetBackdrop({
+        bgFile   = "Interface\\Buttons\\WHITE8x8",
+        edgeFile = "Interface\\Buttons\\WHITE8x8",
+        edgeSize = 1,
+    })
+    btn:SetBackdropBorderColor(0.5, 0.5, 0.5, 1)
+
+    -- Inner swatch (so the border highlight on hover stays visible)
+    local swatch = btn:CreateTexture(nil, "ARTWORK")
+    swatch:SetPoint("TOPLEFT", btn, "TOPLEFT", 2, -2)
+    swatch:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", -22, 2)
+    swatch:SetColorTexture(1, 1, 1, 1)
+
+    local hint = btn:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    hint:SetPoint("RIGHT", btn, "RIGHT", -4, 0)
+    hint:SetText("•••")
+    hint:SetTextColor(1, 0.82, 0)
+
+    btn:SetScript("OnEnter", function(self)
+        self:SetBackdropBorderColor(1, 0.82, 0, 1)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine(L["Click to choose a color"], 1, 1, 1)
+        GameTooltip:Show()
+    end)
+    btn:SetScript("OnLeave", function(self)
+        self:SetBackdropBorderColor(0.5, 0.5, 0.5, 1)
+        GameTooltip:Hide()
+    end)
+
+    local function getColor()
+        return BW:GetDB()[dbKey] or { r = 1, g = 1, b = 1, a = 1 }
+    end
+    local function refreshSwatch()
+        local c = getColor()
+        btn:SetBackdropColor(0, 0, 0, 1) -- dark backdrop so swatch + border read clean
+        swatch:SetVertexColor(c.r, c.g, c.b, c.a or 1)
+    end
+    btn.refresh = refreshSwatch
+    refreshSwatch()
+
+    btn:SetScript("OnClick", function()
+        local c = getColor()
+        local function setColor(r, g, b, a)
+            BW:GetDB()[dbKey] = { r = r, g = g, b = b, a = a or 1 }
+            refreshSwatch()
+            refresh()
+        end
+        local function readAlpha()
+            -- Modern API: ColorPickerFrame:GetColorAlpha(). Fallback to OpacitySliderFrame.
+            if ColorPickerFrame.GetColorAlpha then
+                return ColorPickerFrame:GetColorAlpha() or 1
+            elseif OpacitySliderFrame and OpacitySliderFrame:IsShown() then
+                return OpacitySliderFrame:GetValue()
+            end
+            return 1
+        end
+        if ColorPickerFrame.SetupColorPickerAndShow then
+            ColorPickerFrame:SetupColorPickerAndShow({
+                hasOpacity = true,
+                opacity = c.a or 1,
+                r = c.r, g = c.g, b = c.b,
+                swatchFunc = function()
+                    local r, g, b = ColorPickerFrame:GetColorRGB()
+                    setColor(r, g, b, readAlpha())
+                end,
+                opacityFunc = function()
+                    local r, g, b = ColorPickerFrame:GetColorRGB()
+                    setColor(r, g, b, readAlpha())
+                end,
+                cancelFunc = function(prev)
+                    setColor(prev.r, prev.g, prev.b, prev.opacity or 1)
+                end,
+            })
+        else
+            ColorPickerFrame:SetColorRGB(c.r, c.g, c.b)
+            ColorPickerFrame.hasOpacity = true
+            ColorPickerFrame.opacity = c.a or 1
+            ColorPickerFrame.previousValues = { r = c.r, g = c.g, b = c.b, opacity = c.a or 1 }
+            ColorPickerFrame.func = function()
+                local r, g, b = ColorPickerFrame:GetColorRGB()
+                setColor(r, g, b, ColorPickerFrame.opacity or 1)
+            end
+            ColorPickerFrame.opacityFunc = ColorPickerFrame.func
+            ColorPickerFrame.cancelFunc = function(prev)
+                setColor(prev.r, prev.g, prev.b, prev.opacity or 1)
+            end
+            ColorPickerFrame:Hide()
+            ColorPickerFrame:Show()
+        end
+    end)
+
+    return btn
+end
+
 local function ANCHOR9()
     return {
         { text = L["Top Left"],     value = "TOPLEFT" },
@@ -308,8 +418,8 @@ end
 
 local function makeTab(parent, id, label, idx)
     local tab = CreateFrame("Button", "BWTab"..id, parent, "BackdropTemplate")
-    tab:SetSize(72, 22)
-    tab:SetPoint("TOPLEFT", parent, "TOPLEFT", 8 + (idx - 1) * 76, -28)
+    tab:SetSize(64, 22)
+    tab:SetPoint("TOPLEFT", parent, "TOPLEFT", 8 + (idx - 1) * 68, -28)
     tab:SetBackdrop({
         bgFile = "Interface\\Buttons\\WHITE8x8",
         edgeFile = "Interface\\Buttons\\WHITE8x8",
@@ -378,6 +488,19 @@ local function buildLayoutPage(page)
 
     y = y - 30
     makeCheck(page, L["Enable"], "enabled", 14, y); makeCheck(page, L["Hide Blizzard"], "hideBlizzard", 184, y)
+
+    -- Minimap icon checkbox (account-wide, not per-profile)
+    local cbMini = CreateFrame("CheckButton", "BWOpt_minimapIcon", page, "InterfaceOptionsCheckButtonTemplate")
+    cbMini:SetPoint("TOPLEFT", page, "TOPLEFT", 360, y)
+    cbMini.Text:SetText(L["Show minimap icon"])
+    cbMini:SetChecked(BossWatchDB and BossWatchDB.minimap and not BossWatchDB.minimap.hide)
+    cbMini:SetScript("OnClick", function(self)
+        if BW.ToggleMinimapIcon then BW:ToggleMinimapIcon(self:GetChecked() and true or false) end
+    end)
+    cbMini.refresh = function()
+        cbMini:SetChecked(BossWatchDB and BossWatchDB.minimap and not BossWatchDB.minimap.hide)
+    end
+
     y = y - 26
     makeDropdown(page, L["Anchor"], "anchor", ANCHOR9(), 14, y); makeDropdown(page, L["Grow Direction"], "growDirection", {
         { text = L["Down"], value = "DOWN" }, { text = L["Up"], value = "UP" },
@@ -414,9 +537,23 @@ local function buildBarsPage(page)
         { text = L["Class fallback"],      value = "CLASS_FALLBACK" },
         { text = L["Custom static"],       value = "STATIC" },
     }, 14, y, 180)
+    makeColorPicker(page, L["Static color"], "healthStaticColor", 260, y)
     y = y - 50
     makeSlider(page, L["HP background alpha"], "healthBackgroundAlpha", 0, 1, 0.05, 14, y)
     makeSlider(page, L["Power background alpha"], "powerBackgroundAlpha", 0, 1, 0.05, 260, y)
+
+    y = y - 60
+    local th = page:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    th:SetPoint("TOPLEFT", 14, y)
+    th:SetText(L["Target Highlight"])
+    y = y - 22
+
+    makeCheck(page, L["Highlight current target"], "targetHighlight", 14, y)
+    makeCheck(page, L["Animate (pulse)"], "targetHighlightAnimate", 260, y)
+    y = y - 30
+
+    makeColorPicker(page, L["Border color"], "targetHighlightColor", 14, y)
+    makeSlider(page, L["Border thickness"], "targetHighlightThickness", 1, 6, 1, 260, y)
 end
 
 local function buildCastPage(page)
@@ -545,17 +682,229 @@ local function buildAurasPage(page)
     }, 14, y)
 end
 
+-- ============================================================
+-- PROFILES PAGE
+-- ============================================================
+local profileDropdownRefresh
+
+local function showProfilePopup(title, defaultText, onAccept)
+    StaticPopupDialogs["BOSSWATCH_PROFILE_PROMPT"] = {
+        text = title,
+        button1 = ACCEPT or "OK",
+        button2 = CANCEL or "Cancel",
+        hasEditBox = true,
+        maxLetters = 32,
+        OnShow = function(self) self.editBox:SetText(defaultText or "") self.editBox:HighlightText() end,
+        OnAccept = function(self) onAccept(self.editBox:GetText()) end,
+        EditBoxOnEnterPressed = function(self) onAccept(self:GetParent().editBox:GetText()); self:GetParent():Hide() end,
+        EditBoxOnEscapePressed = function(self) self:GetParent():Hide() end,
+        timeout = 0, whileDead = true, hideOnEscape = true,
+    }
+    StaticPopup_Show("BOSSWATCH_PROFILE_PROMPT")
+end
+
+local function showConfirmPopup(text, onAccept)
+    StaticPopupDialogs["BOSSWATCH_PROFILE_CONFIRM"] = {
+        text = text,
+        button1 = YES or "Yes", button2 = NO or "No",
+        OnAccept = onAccept,
+        timeout = 0, whileDead = true, hideOnEscape = true,
+    }
+    StaticPopup_Show("BOSSWATCH_PROFILE_CONFIRM")
+end
+
+local function buildProfilesPage(page)
+    local y = -10
+
+    -- Character label
+    local charLabel = page:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    charLabel:SetPoint("TOPLEFT", 14, y)
+    charLabel:SetText(L["Character:"] .. " |cffffffff" .. (BW:GetCharKey()) .. "|r")
+
+    y = y - 24
+
+    -- Active profile dropdown
+    local labelFS = page:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    labelFS:SetPoint("TOPLEFT", 14, y)
+    labelFS:SetText(L["Active profile"])
+
+    local dd = CreateFrame("Frame", "BWOpt_DD_activeProfile", page, "UIDropDownMenuTemplate")
+    dd:SetPoint("TOPLEFT", labelFS, "BOTTOMLEFT", -18, -2)
+    UIDropDownMenu_SetWidth(dd, 200)
+
+    UIDropDownMenu_Initialize(dd, function()
+        for _, name in ipairs(BW:ListProfiles()) do
+            local info = UIDropDownMenu_CreateInfo()
+            info.text = name
+            info.value = name
+            info.checked = (name == BW:GetActiveProfileName())
+            info.func = function()
+                BW:SetActiveProfile(name)
+                UIDropDownMenu_SetText(dd, name)
+                if panel and panel.refreshAll then panel.refreshAll() end
+            end
+            UIDropDownMenu_AddButton(info)
+        end
+    end)
+    profileDropdownRefresh = function()
+        UIDropDownMenu_SetText(dd, BW:GetActiveProfileName())
+    end
+    profileDropdownRefresh()
+
+    y = y - 56
+
+    -- New / Reset / Delete buttons (horizontal row below the dropdown)
+    local btnNew = CreateFrame("Button", nil, page, "UIPanelButtonTemplate")
+    btnNew:SetSize(110, 22)
+    btnNew:SetPoint("TOPLEFT", 14, y)
+    btnNew:SetText(L["New..."])
+    btnNew:SetScript("OnClick", function()
+        showProfilePopup(L["Name of the new profile (copies current settings):"], "", function(name)
+            name = (name or ""):gsub("^%s+", ""):gsub("%s+$", "")
+            if name == "" then return end
+            local ok = BW:CreateProfile(name)
+            if ok then
+                BW:SetActiveProfile(name)
+                profileDropdownRefresh()
+                if panel and panel.refreshAll then panel.refreshAll() end
+                print("|cffeda55fBossWatch:|r " .. format(L["profile '%s' created"], name))
+            end
+        end)
+    end)
+
+    local btnReset = CreateFrame("Button", nil, page, "UIPanelButtonTemplate")
+    btnReset:SetSize(110, 22)
+    btnReset:SetPoint("LEFT", btnNew, "RIGHT", 6, 0)
+    btnReset:SetText(L["Reset"])
+    btnReset:SetScript("OnClick", function()
+        local name = BW:GetActiveProfileName()
+        showConfirmPopup(format(L["Reset profile '%s' to defaults?"], name), function()
+            BW:ResetProfile(name)
+            if BW.RefreshAll then BW:RefreshAll() end
+            if BW.ApplyFonts then BW:ApplyFonts() end
+            if panel and panel.refreshAll then panel.refreshAll() end
+        end)
+    end)
+
+    local btnDelete = CreateFrame("Button", nil, page, "UIPanelButtonTemplate")
+    btnDelete:SetSize(110, 22)
+    btnDelete:SetPoint("LEFT", btnReset, "RIGHT", 6, 0)
+    btnDelete:SetText(L["Delete"])
+    btnDelete:SetScript("OnClick", function()
+        local name = BW:GetActiveProfileName()
+        if name == "Default" then
+            print("|cffeda55fBossWatch:|r " .. L["cannot delete Default"])
+            return
+        end
+        showConfirmPopup(format(L["Delete profile '%s'?"], name), function()
+            BW:DeleteProfile(name)
+            profileDropdownRefresh()
+            if BW.RefreshAll then BW:RefreshAll() end
+            if BW.ApplyFonts then BW:ApplyFonts() end
+            if panel and panel.refreshAll then panel.refreshAll() end
+        end)
+    end)
+
+    y = y - 36
+
+    -- Export
+    local exportLabel = page:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    exportLabel:SetPoint("TOPLEFT", 14, y)
+    exportLabel:SetText(L["Export"])
+
+    y = y - 18
+
+    local exportScroll = CreateFrame("ScrollFrame", nil, page, "InputScrollFrameTemplate")
+    exportScroll:SetPoint("TOPLEFT", 14, y)
+    exportScroll:SetSize(520, 80)
+    local exportEdit = exportScroll.EditBox
+    exportEdit:SetMaxLetters(0)
+    exportEdit:SetFontObject("GameFontHighlightSmall")
+    exportEdit:SetWidth(498)
+    exportEdit:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+
+    local function refreshExport()
+        local s = BW:ExportProfile()
+        exportEdit:SetText(s or "")
+    end
+    refreshExport()
+
+    local btnRefreshExport = CreateFrame("Button", nil, page, "UIPanelButtonTemplate")
+    btnRefreshExport:SetSize(130, 22)
+    btnRefreshExport:SetPoint("TOPLEFT", exportScroll, "BOTTOMLEFT", 0, -4)
+    btnRefreshExport:SetText(L["Refresh export"])
+    btnRefreshExport:SetScript("OnClick", refreshExport)
+
+    local btnSelectAll = CreateFrame("Button", nil, page, "UIPanelButtonTemplate")
+    btnSelectAll:SetSize(130, 22)
+    btnSelectAll:SetPoint("LEFT", btnRefreshExport, "RIGHT", 6, 0)
+    btnSelectAll:SetText(L["Select all"])
+    btnSelectAll:SetScript("OnClick", function()
+        exportEdit:SetFocus(); exportEdit:HighlightText()
+    end)
+
+    y = y - 116
+
+    -- Import
+    local importLabel = page:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    importLabel:SetPoint("TOPLEFT", 14, y)
+    importLabel:SetText(L["Import"])
+
+    y = y - 18
+
+    local importScroll = CreateFrame("ScrollFrame", nil, page, "InputScrollFrameTemplate")
+    importScroll:SetPoint("TOPLEFT", 14, y)
+    importScroll:SetSize(520, 80)
+    local importEdit = importScroll.EditBox
+    importEdit:SetMaxLetters(0)
+    importEdit:SetFontObject("GameFontHighlightSmall")
+    importEdit:SetWidth(498)
+    importEdit:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+
+    local btnImport = CreateFrame("Button", nil, page, "UIPanelButtonTemplate")
+    btnImport:SetSize(200, 22)
+    btnImport:SetPoint("TOPLEFT", importScroll, "BOTTOMLEFT", 0, -4)
+    btnImport:SetText(L["Import as new profile..."])
+    btnImport:SetScript("OnClick", function()
+        local text = importEdit:GetText() or ""
+        if text:gsub("%s", "") == "" then
+            print("|cffeda55fBossWatch:|r " .. L["import box is empty"])
+            return
+        end
+        showProfilePopup(L["Name for the imported profile:"], "", function(name)
+            name = (name or ""):gsub("^%s+", ""):gsub("%s+$", "")
+            if name == "" then return end
+            local ok, err = BW:ImportProfile(text, name)
+            if ok then
+                BW:SetActiveProfile(name)
+                profileDropdownRefresh()
+                if panel and panel.refreshAll then panel.refreshAll() end
+                print("|cffeda55fBossWatch:|r " .. format(L["profile '%s' imported"], name))
+            else
+                print("|cffeda55fBossWatch:|r " .. L["import failed:"] .. " " .. tostring(err))
+            end
+        end)
+    end)
+end
+
 local function buildAboutPage(page)
     local version = C_AddOns and C_AddOns.GetAddOnMetadata(addonName, "Version") or "?"
     local author  = C_AddOns and C_AddOns.GetAddOnMetadata(addonName, "Author")  or "Timikana"
 
+    -- Logo (top left)
+    local logo = page:CreateTexture(nil, "ARTWORK")
+    logo:SetSize(140, 140)
+    logo:SetPoint("TOPLEFT", page, "TOPLEFT", 14, -14)
+    logo:SetTexture("Interface\\AddOns\\BossWatch\\Media\\logo.png")
+
+    -- Right column anchored to logo
     local title = page:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOPLEFT", 14, -14)
+    title:SetPoint("TOPLEFT", logo, "TOPRIGHT", 16, -4)
     title:SetText("|cffeda55fBossWatch|r  v" .. version)
 
     local sub = page:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    sub:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
-    sub:SetWidth(520); sub:SetJustifyH("LEFT")
+    sub:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -8)
+    sub:SetWidth(360); sub:SetJustifyH("LEFT")
     sub:SetText(L["Custom boss target frames for WoW Retail / Midnight 12.0."])
 
     local byLabel = page:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -581,11 +930,12 @@ local function buildAboutPage(page)
         return eb
     end
 
-    urlField(-90,  L["GitHub repository:"],    "https://github.com/Timikana/BossWatch")
-    urlField(-150, L["Report an issue:"],      "https://github.com/Timikana/BossWatch/issues")
+    -- URL fields go BELOW the logo (logo ends at y=-154 with 14px margin + 140 height)
+    urlField(-170, L["GitHub repository:"], "https://github.com/Timikana/BossWatch")
+    urlField(-230, L["Report an issue:"],   "https://github.com/Timikana/BossWatch/issues")
 
     local cmdHeader = page:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    cmdHeader:SetPoint("TOPLEFT", 14, -210)
+    cmdHeader:SetPoint("TOPLEFT", 14, -290)
     cmdHeader:SetText(L["Slash commands"])
 
     local cmds = page:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -631,22 +981,24 @@ local function build()
         return p
     end
 
-    pages.layout = newPage(); buildLayoutPage(pages.layout)
-    pages.bars   = newPage(); buildBarsPage(pages.bars)
-    pages.cast   = newPage(); buildCastPage(pages.cast)
-    pages.text   = newPage(); buildTextPage(pages.text)
-    pages.raid   = newPage(); buildRaidMarkerPage(pages.raid)
-    pages.auras  = newPage(); buildAurasPage(pages.auras)
-    pages.about  = newPage(); buildAboutPage(pages.about)
+    pages.layout   = newPage(); buildLayoutPage(pages.layout)
+    pages.bars     = newPage(); buildBarsPage(pages.bars)
+    pages.cast     = newPage(); buildCastPage(pages.cast)
+    pages.text     = newPage(); buildTextPage(pages.text)
+    pages.raid     = newPage(); buildRaidMarkerPage(pages.raid)
+    pages.auras    = newPage(); buildAurasPage(pages.auras)
+    pages.profiles = newPage(); buildProfilesPage(pages.profiles)
+    pages.about    = newPage(); buildAboutPage(pages.about)
 
     local tabs = {
-        { id = "layout", label = L["Layout"] },
-        { id = "bars",   label = L["Bars"] },
-        { id = "cast",   label = L["Cast Bar"] },
-        { id = "text",   label = L["Text"] },
-        { id = "raid",   label = L["Raid Marker"] },
-        { id = "auras",  label = L["Auras"] },
-        { id = "about",  label = L["About"] },
+        { id = "layout",   label = L["Layout"] },
+        { id = "bars",     label = L["Bars"] },
+        { id = "cast",     label = L["Cast Bar"] },
+        { id = "text",     label = L["Text"] },
+        { id = "raid",     label = L["Raid Marker"] },
+        { id = "auras",    label = L["Auras"] },
+        { id = "profiles", label = L["Profiles"] },
+        { id = "about",    label = L["About"] },
     }
     local tabBtns = {}
     local function selectTab(id)

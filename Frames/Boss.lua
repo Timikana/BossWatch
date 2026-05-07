@@ -149,6 +149,43 @@ end
 -- ============================================================
 -- FRAME UPDATE
 -- ============================================================
+local function applyTargetHighlight(frame)
+    local hl = frame and frame.targetHighlight
+    if not hl then return end
+    local db = BW:GetDB()
+    if not db.targetHighlight then
+        if hl._anim then hl._anim:Stop() end
+        hl:Hide()
+        return
+    end
+    local c = db.targetHighlightColor or { r = 1, g = 0.82, b = 0, a = 1 }
+    local thick = db.targetHighlightThickness or 2
+    pcall(hl.SetBackdrop, hl, {
+        edgeFile = "Interface\\Buttons\\WHITE8x8",
+        edgeSize = thick,
+    })
+    hl:SetBackdropBorderColor(c.r, c.g, c.b, c.a or 1)
+    local isTarget = false
+    if frame._fakeTarget then
+        isTarget = true
+    else
+        pcall(function() isTarget = UnitIsUnit("target", frame.unit) end)
+    end
+    if isTarget and frame:IsShown() then
+        hl:SetAlpha(1)
+        hl:Show()
+        if db.targetHighlightAnimate and hl._anim then
+            if not hl._anim:IsPlaying() then hl._anim:Play() end
+        elseif hl._anim then
+            hl._anim:Stop()
+        end
+    else
+        if hl._anim then hl._anim:Stop() end
+        hl:Hide()
+    end
+end
+BW._applyTargetHighlight = applyTargetHighlight
+
 local function UpdateFrame(frame)
     local unit = frame.unit
     local db = BW:GetDB()
@@ -230,6 +267,9 @@ local function UpdateFrame(frame)
 
     -- Auras
     if BW.UpdateAuras then BW.UpdateAuras(frame) end
+
+    -- Target highlight border
+    applyTargetHighlight(frame)
 end
 BW.UpdateFrame = UpdateFrame
 
@@ -505,6 +545,28 @@ local function CreateBossFrame(index)
     rti:Hide()
     f.raidTargetIcon = rti
 
+    -- Target highlight border (shown when player.target == this boss)
+    local hl = CreateFrame("Frame", nil, f, "BackdropTemplate")
+    hl:SetPoint("TOPLEFT", f, "TOPLEFT", -2, 2)
+    hl:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", 2, -2)
+    hl:SetFrameLevel((f:GetFrameLevel() or 1) + 5)
+    hl:SetBackdrop({
+        edgeFile = "Interface\\Buttons\\WHITE8x8",
+        edgeSize = 2,
+    })
+    hl:SetBackdropBorderColor(1, 0.82, 0, 1)
+    hl:Hide()
+    f.targetHighlight = hl
+
+    local ag = hl:CreateAnimationGroup()
+    ag:SetLooping("BOUNCE")
+    local a1 = ag:CreateAnimation("Alpha")
+    a1:SetFromAlpha(1)
+    a1:SetToAlpha(0.35)
+    a1:SetDuration(0.7)
+    a1:SetSmoothing("IN_OUT")
+    hl._anim = ag
+
     -- Events
     f:RegisterEvent("UNIT_HEALTH")
     f:RegisterEvent("UNIT_MAXHEALTH")
@@ -539,6 +601,7 @@ function BW:EnsureCreated()
     container:SetPoint(db.anchor or "RIGHT", UIParent, db.anchor or "RIGHT", db.anchorX or 0, db.anchorY or 0)
     container:SetFrameStrata(db.frameStrata or "MEDIUM")
     container:SetMovable(true)
+    container:SetClampedToScreen(true)
     BW.BossContainer = container
 
     for i = 1, MAX_BOSS do BW.BossFrames[i] = CreateBossFrame(i) end
@@ -613,16 +676,19 @@ local testTicker = CreateFrame("Frame")
 testTicker:Hide()
 local _testNextCast = {}
 local _testElapsed = 0
+local _testNextTargetSwap = 0
 testTicker:SetScript("OnUpdate", function(self, e)
     _testElapsed = _testElapsed + e
     if _testElapsed < 0.1 then return end
     _testElapsed = 0
     local now = GetTime()
     local active
+    local activeIndices = {}
     for i = 1, MAX_BOSS do
         local f = BW.BossFrames[i]
         if f and f._testMode then
             active = true
+            activeIndices[#activeIndices + 1] = i
             f._testHpDir = f._testHpDir or -1
             f._testHp = (f._testHp or 80) + f._testHpDir * (0.3 + i * 0.1)
             if f._testHp <= 10 then f._testHpDir = 1
@@ -634,6 +700,21 @@ testTicker:SetScript("OnUpdate", function(self, e)
             end
             UpdateFrame(f)
         end
+    end
+    -- Rotate the fake target every 3s so the user can preview the highlight
+    if active and now >= _testNextTargetSwap then
+        local pick = activeIndices[math.random(1, #activeIndices)]
+        for i = 1, MAX_BOSS do
+            local f = BW.BossFrames[i]
+            if f then f._fakeTarget = (i == pick) end
+        end
+        if BW._applyTargetHighlight then
+            for i = 1, MAX_BOSS do
+                local f = BW.BossFrames[i]
+                if f then BW._applyTargetHighlight(f) end
+            end
+        end
+        _testNextTargetSwap = now + 3
     end
     if not active then self:Hide() end
 end)
@@ -667,6 +748,7 @@ function BW:SetTestMode(count)
                 f._testMode = false
                 f._testName = nil; f._testHp = nil; f._testHpDir = nil; f._testPower = nil
                 f._testAuras = nil
+                f._fakeTarget = nil
                 _testNextCast[i] = nil
                 if f.castBar then f.castBar:Hide() end
                 if not InCombatLockdown() then
@@ -695,7 +777,15 @@ eventFrame:RegisterEvent("INSTANCE_ENCOUNTER_ENGAGE_UNIT")
 eventFrame:RegisterEvent("ENCOUNTER_START")
 eventFrame:RegisterEvent("ENCOUNTER_END")
 eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
+eventFrame:RegisterEvent("PLAYER_TARGET_CHANGED")
 eventFrame:SetScript("OnEvent", function(_, event)
+    if event == "PLAYER_TARGET_CHANGED" then
+        for i = 1, BW.MAX_BOSS do
+            local f = BW.BossFrames[i]
+            if f then applyTargetHighlight(f) end
+        end
+        return
+    end
     if event == "PLAYER_REGEN_ENABLED" and _pendingLayout then
         _pendingLayout = false
         BW:EnsureCreated()
