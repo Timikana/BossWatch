@@ -8,6 +8,70 @@ local panel
 local refresh = function() if BW.RefreshAll then BW:RefreshAll() end end
 
 -- ============================================================
+-- "NEW" BADGE
+-- ============================================================
+local function markAsNew(widget, dbKey)
+    if not dbKey or not widget then return end
+    BossWatchDB = BossWatchDB or {}
+    BossWatchDB.seenFeatures = BossWatchDB.seenFeatures or {}
+    if BossWatchDB.seenFeatures[dbKey] then return end
+
+    -- Badge container
+    local badge = CreateFrame("Frame", nil, widget, "BackdropTemplate")
+    badge:SetSize(38, 16)
+    badge:SetPoint("BOTTOMLEFT", widget, "TOPLEFT", -3, 1)
+    badge:SetFrameLevel((widget.GetFrameLevel and widget:GetFrameLevel() or 1) + 5)
+    badge:SetBackdrop({
+        bgFile   = "Interface\\Buttons\\WHITE8x8",
+        edgeFile = "Interface\\Buttons\\WHITE8x8",
+        edgeSize = 1,
+    })
+    badge:SetBackdropColor(1, 0.6, 0, 0.85)        -- orange fill
+    badge:SetBackdropBorderColor(1, 1, 0.5, 1)     -- bright yellow border
+
+    -- Glow halo behind (additive blend, visible as a soft outer glow)
+    local glow = badge:CreateTexture(nil, "BACKGROUND")
+    glow:SetTexture("Interface\\Buttons\\UI-ActionButton-Border")
+    glow:SetBlendMode("ADD")
+    glow:SetVertexColor(1, 0.85, 0, 0.9)
+    glow:SetPoint("CENTER", badge, "CENTER", 0, 0)
+    glow:SetSize(58, 36)
+
+    -- Text on top
+    local text = badge:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    text:SetText("NEW")
+    text:SetTextColor(1, 1, 1)
+    text:SetPoint("CENTER", badge, "CENTER", 0, 0)
+    text:SetShadowColor(0, 0, 0, 1)
+    text:SetShadowOffset(1, -1)
+
+    -- Pulse animation on the glow
+    local ag = glow:CreateAnimationGroup()
+    ag:SetLooping("BOUNCE")
+    local a = ag:CreateAnimation("Alpha")
+    a:SetFromAlpha(1)
+    a:SetToAlpha(0.3)
+    a:SetDuration(0.8)
+    a:SetSmoothing("IN_OUT")
+    ag:Play()
+
+    local function clear()
+        BossWatchDB.seenFeatures = BossWatchDB.seenFeatures or {}
+        BossWatchDB.seenFeatures[dbKey] = true
+        if ag then ag:Stop() end
+        badge:Hide()
+    end
+
+    widget:HookScript("OnEnter", clear)
+    local typ = widget.GetObjectType and widget:GetObjectType() or ""
+    if typ == "CheckButton" or typ == "Button" then
+        widget:HookScript("OnClick", clear)
+    elseif typ == "Slider" then
+        widget:HookScript("OnValueChanged", clear)
+    end
+end
+
+-- ============================================================
 -- WIDGET FACTORIES
 -- ============================================================
 
@@ -529,7 +593,7 @@ local function buildBarsPage(page)
     y = y - 50
     makeMediaDropdown(page, L["Power Texture"], "powerTexture", "statusbar", 14, y, 180)
     y = y - 50
-    makeMediaDropdown(page, L["Background Texture"], "barBackgroundTexture", "statusbar", 14, y, 180)
+    markAsNew(makeMediaDropdown(page, L["Background Texture"], "barBackgroundTexture", "statusbar", 14, y, 180), "barBackgroundTexture")
     y = y - 50
     makeCheck(page, L["Show Power Bar"], "showPowerBar", 14, y)
     makeSlider(page, L["Power Bar Height"], "powerBarHeight", 2, 20, 1, 184, y)
@@ -541,11 +605,11 @@ local function buildBarsPage(page)
     }, 14, y, 180)
     makeColorPicker(page, L["Static color"], "healthStaticColor", 260, y)
     y = y - 50
-    makeSlider(page, L["Frame background alpha"], "frameBackgroundAlpha", 0, 1, 0.05, 14, y)
+    markAsNew(makeSlider(page, L["Frame background alpha"], "frameBackgroundAlpha", 0, 1, 0.05, 14, y), "frameBackgroundAlpha")
     makeSlider(page, L["HP background alpha"], "healthBackgroundAlpha", 0, 1, 0.05, 260, y)
     y = y - 50
     makeSlider(page, L["Power background alpha"], "powerBackgroundAlpha", 0, 1, 0.05, 14, y)
-    makeCheck(page, L["Frame bg wraps cast zone"], "frameBgWrapsCast", 260, y - 4)
+    markAsNew(makeCheck(page, L["Frame bg wraps cast zone"], "frameBgWrapsCast", 260, y - 4), "frameBgWrapsCast")
 
     y = y - 60
     local th = page:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -553,17 +617,17 @@ local function buildBarsPage(page)
     th:SetText(L["Target Highlight"])
     y = y - 22
 
-    makeCheck(page, L["Highlight current target"], "targetHighlight", 14, y)
-    makeCheck(page, L["Animate (pulse)"], "targetHighlightAnimate", 184, y)
-    makeSlider(page, L["Thickness"], "targetHighlightThickness", 1, 6, 1, 354, y, 130)
+    markAsNew(makeCheck(page, L["Highlight current target"], "targetHighlight", 14, y), "targetHighlight")
+    markAsNew(makeCheck(page, L["Animate (pulse)"], "targetHighlightAnimate", 184, y), "targetHighlightAnimate")
+    markAsNew(makeSlider(page, L["Thickness"], "targetHighlightThickness", 1, 6, 1, 354, y, 130), "targetHighlightThickness")
     y = y - 30
 
-    makeDropdown(page, L["Color mode"], "targetHighlightColorMode", {
+    markAsNew(makeDropdown(page, L["Color mode"], "targetHighlightColorMode", {
         { text = L["Static"],         value = "STATIC" },
         { text = L["Class color"],    value = "CLASS" },
         { text = L["Reaction"],       value = "REACTION" },
-    }, 14, y, 180)
-    makeColorPicker(page, L["Static color"], "targetHighlightColor", 260, y)
+    }, 14, y, 180), "targetHighlightColorMode")
+    markAsNew(makeColorPicker(page, L["Static color"], "targetHighlightColor", 260, y), "targetHighlightColor")
 end
 
 local function buildCastPage(page)
