@@ -223,7 +223,7 @@ local function makeMediaDropdown(parent, label, key, mediaType, x, y, width)
             pcall(previewText.SetFont, previewText, BW:ResolveFont(name), 13, "")
         else
             previewTex:SetTexture(BW:ResolveTexture(name))
-            previewTex:SetVertexColor(0.9, 0.2, 0.2, 1)
+            previewTex:SetVertexColor(1, 0.82, 0, 1)
         end
     end
 
@@ -321,7 +321,7 @@ local function makeMediaDropdown(parent, label, key, mediaType, x, y, width)
                 it.fs:SetText(name)
             else
                 it.bar:SetTexture(BW:ResolveTexture(name))
-                it.bar:SetVertexColor(0.9, 0.2, 0.2, 1)
+                it.bar:SetVertexColor(1, 0.82, 0, 1)
                 it.nameFS:SetText(name)
             end
             it:SetScript("OnClick", function()
@@ -1234,7 +1234,7 @@ local function build()
 
     if panel.SetTitle then panel:SetTitle(L["BossWatch — Options"]) end
     if panel.SetPortraitToAsset then
-        panel:SetPortraitToAsset("Interface\\AddOns\\BossWatch\\logo.png")
+        panel:SetPortraitToAsset("Interface\\AddOns\\BossWatch\\Media\\logo.png")
     end
 
     local pageHolder = CreateFrame("Frame", nil, panel)
