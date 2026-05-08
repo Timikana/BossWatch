@@ -712,10 +712,10 @@ local function buildBarsPage(page)
 
     -- ============ TEXTURES ============
     makeSection(page, L["Textures"], 14, y); y = y - 24
-    addTooltip(makeMediaDropdown(page, L["Health Texture"], "healthTexture", "statusbar", 14, y, 180),
+    addTooltip(makeMediaDropdown(page, L["Health Texture"], "healthTexture", "statusbar", 14, y, 180, {0.9, 0.2, 0.2}),
         L["Status bar texture used for the boss health bar."])
     y = y - 50
-    addTooltip(makeMediaDropdown(page, L["Power Texture"], "powerTexture", "statusbar", 14, y, 180),
+    addTooltip(makeMediaDropdown(page, L["Power Texture"], "powerTexture", "statusbar", 14, y, 180, {0.3, 0.45, 1}),
         L["Status bar texture used for the boss power (mana / rage / etc.) bar."])
     y = y - 50
     addTooltip(markAsNew(makeMediaDropdown(page, L["Background Texture"], "barBackgroundTexture", "statusbar", 14, y, 180), "barBackgroundTexture"),
