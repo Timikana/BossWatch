@@ -955,9 +955,9 @@ local function showProfilePopup(title, defaultText, onAccept)
         button2 = CANCEL or "Cancel",
         hasEditBox = true,
         maxLetters = 32,
-        OnShow = function(self) self.editBox:SetText(defaultText or "") self.editBox:HighlightText() end,
-        OnAccept = function(self) onAccept(self.editBox:GetText()) end,
-        EditBoxOnEnterPressed = function(self) onAccept(self:GetParent().editBox:GetText()); self:GetParent():Hide() end,
+        OnShow = function(self) self.EditBox:SetText(defaultText or "") self.EditBox:HighlightText() end,
+        OnAccept = function(self) onAccept(self.EditBox:GetText()) end,
+        EditBoxOnEnterPressed = function(self) onAccept(self:GetText()); self:GetParent():Hide() end,
         EditBoxOnEscapePressed = function(self) self:GetParent():Hide() end,
         timeout = 0, whileDead = true, hideOnEscape = true,
     }
