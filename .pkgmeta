@@ -1,6 +1,7 @@
 package-as: BossWatch
 
 curse-project-id: 1535856
+wago-project-id: mKODekGx
 
 ignore:
   - .gitignore
