@@ -1233,7 +1233,19 @@ local function build()
     tinsert(UISpecialFrames, "BossWatchOptions")
 
     if panel.SetTitle then panel:SetTitle(L["BossWatch — Options"]) end
-    if panel.SetPortraitToAsset then
+    -- Set the portrait by direct texture access (more reliable than SetPortraitToAsset
+    -- across template variants — that API sometimes fails silently and shows the
+    -- green default placeholder).
+    local portraitTex
+    if panel.PortraitContainer and panel.PortraitContainer.portrait then
+        portraitTex = panel.PortraitContainer.portrait
+    elseif panel.GetPortrait then
+        portraitTex = panel:GetPortrait()
+    end
+    if portraitTex then
+        portraitTex:SetTexture("Interface\\AddOns\\BossWatch\\Media\\logo.png")
+        portraitTex:SetTexCoord(0, 1, 0, 1)
+    elseif panel.SetPortraitToAsset then
         panel:SetPortraitToAsset("Interface\\AddOns\\BossWatch\\Media\\logo.png")
     end
 
