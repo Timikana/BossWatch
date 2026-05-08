@@ -76,42 +76,50 @@ end
 -- ============================================================
 
 local function makeSlider(parent, label, key, minV, maxV, step, x, y, width)
-    local sl = CreateFrame("Slider", "BWOpt_"..key, parent, "OptionsSliderTemplate")
+    local sl = CreateFrame("Frame", "BWOpt_"..key, parent, "MinimalSliderWithSteppersTemplate")
     sl:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y)
-    sl:SetWidth(width or 180)
-    sl:SetMinMaxValues(minV, maxV)
-    sl:SetValueStep(step)
-    sl:SetObeyStepOnDrag(true)
-    _G[sl:GetName().."Low"]:SetText(""); _G[sl:GetName().."High"]:SetText("")
-    _G[sl:GetName().."Text"]:SetText(label)
-
-    local edit = CreateFrame("EditBox", nil, sl, "InputBoxTemplate")
-    edit:SetSize(46, 18)
-    edit:SetPoint("LEFT", sl, "RIGHT", 8, 0)
-    edit:SetAutoFocus(false)
-    edit:SetFontObject("GameFontHighlightSmall")
-    sl.edit = edit
+    sl:SetWidth(width or 200)
     sl.dbKey = key
 
-    sl:SetScript("OnValueChanged", function(self, val)
-        if step < 1 then val = math.floor(val * 100 + 0.5) / 100
-        else val = math.floor(val + 0.5) end
-        local db = BW:GetDB()
-        db[key] = val
-        edit:SetText(tostring(val))
+    local function fmt(v)
+        if step < 1 then return string.format("%.2f", v) end
+        return tostring(math.floor(v + 0.5))
+    end
+
+    local formatters = {
+        [MinimalSliderWithSteppersMixin.Label.Min] = function() return fmt(minV) end,
+        [MinimalSliderWithSteppersMixin.Label.Max] = function() return fmt(maxV) end,
+        [MinimalSliderWithSteppersMixin.Label.Top] = function(v) return label .. ": " .. fmt(v) end,
+    }
+
+    local numSteps = math.max(1, math.floor((maxV - minV) / step + 0.5))
+    local function readDB()
+        local v = BW:GetDB()[key]
+        if type(v) ~= "number" then v = minV end
+        if v < minV then v = minV elseif v > maxV then v = maxV end
+        return v
+    end
+
+    sl:Init(readDB(), minV, maxV, numSteps, formatters)
+
+    local event = (MinimalSliderWithSteppersMixin.Event
+        and MinimalSliderWithSteppersMixin.Event.OnValueChanged) or "OnValueChanged"
+    sl:RegisterCallback(event, function(_, value)
+        if step < 1 then value = math.floor(value * 100 + 0.5) / 100
+        else value = math.floor(value + 0.5) end
+        BW:GetDB()[key] = value
         refresh()
-    end)
-    edit:SetScript("OnEnterPressed", function(self)
-        local v = tonumber(self:GetText())
-        if v then sl:SetValue(v) end
-        self:ClearFocus()
-    end)
+    end, sl)
+
+    sl.refresh = function() sl:Init(readDB(), minV, maxV, numSteps, formatters) end
     return sl
 end
 
 local function makeCheck(parent, label, key, x, y)
-    local cb = CreateFrame("CheckButton", "BWOpt_"..key, parent, "InterfaceOptionsCheckButtonTemplate")
+    local cb = CreateFrame("CheckButton", "BWOpt_"..key, parent, "UICheckButtonTemplate")
     cb:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y)
+    cb:SetSize(24, 24)
+    cb.Text:SetFontObject("GameFontHighlight")
     cb.Text:SetText(label)
     cb.dbKey = key
     cb:SetScript("OnClick", function(self)
@@ -126,34 +134,24 @@ local function makeDropdown(parent, label, key, options, x, y, width)
     labelFS:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y)
     labelFS:SetText(label)
 
-    local dd = CreateFrame("Frame", "BWOpt_DD_"..key, parent, "UIDropDownMenuTemplate")
-    dd:SetPoint("TOPLEFT", labelFS, "BOTTOMLEFT", -18, -2)
-    UIDropDownMenu_SetWidth(dd, width or 130)
+    -- Modern 11.0 dropdown (same template used by native Settings panels)
+    local dd = CreateFrame("DropdownButton", "BWOpt_DD_"..key, parent, "WowStyle1DropdownTemplate")
+    dd:SetPoint("TOPLEFT", labelFS, "BOTTOMLEFT", 0, -2)
+    dd:SetWidth(width or 160)
     dd.dbKey = key
     dd._options = options
 
-    local function setSelected(val, text)
-        BW:GetDB()[key] = val
-        UIDropDownMenu_SetText(dd, text)
-        refresh()
-    end
-
-    UIDropDownMenu_Initialize(dd, function()
+    dd:SetupMenu(function(_, rootDescription)
         for _, opt in ipairs(options) do
-            local info = UIDropDownMenu_CreateInfo()
-            info.text = opt.text
-            info.value = opt.value
-            info.func = function() setSelected(opt.value, opt.text) end
-            info.checked = (BW:GetDB()[key] == opt.value)
-            UIDropDownMenu_AddButton(info)
+            rootDescription:CreateRadio(opt.text,
+                function() return BW:GetDB()[key] == opt.value end,
+                function()
+                    BW:GetDB()[key] = opt.value
+                    refresh()
+                end)
         end
     end)
-    dd.refresh = function()
-        local cur = BW:GetDB()[key]
-        for _, opt in ipairs(options) do
-            if opt.value == cur then UIDropDownMenu_SetText(dd, opt.text); return end
-        end
-    end
+    dd.refresh = function() dd:GenerateMenu() end
     return dd
 end
 
@@ -167,17 +165,23 @@ local function makeMediaDropdown(parent, label, key, mediaType, x, y, width)
     labelFS:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y)
     labelFS:SetText(label)
 
-    -- Anchor button (acts as the dropdown header)
+    -- Anchor button (acts as the dropdown header) — modern dark style
     local btn = CreateFrame("Button", nil, parent, "BackdropTemplate")
-    btn:SetSize(width, 22)
+    btn:SetSize(width, 24)
     btn:SetPoint("TOPLEFT", labelFS, "BOTTOMLEFT", 0, -4)
     btn:SetBackdrop({
         bgFile   = "Interface\\Buttons\\WHITE8x8",
         edgeFile = "Interface\\Buttons\\WHITE8x8",
         edgeSize = 1,
     })
-    btn:SetBackdropColor(0.08, 0.08, 0.10, 1)
-    btn:SetBackdropBorderColor(0.4, 0.4, 0.4, 1)
+    btn:SetBackdropColor(0.06, 0.06, 0.08, 1)
+    btn:SetBackdropBorderColor(0.35, 0.35, 0.40, 1)
+    btn:HookScript("OnEnter", function(self)
+        self:SetBackdropBorderColor(1, 0.82, 0, 1)
+    end)
+    btn:HookScript("OnLeave", function(self)
+        self:SetBackdropBorderColor(0.35, 0.35, 0.40, 1)
+    end)
     btn.dbKey = key
 
     local btnText = btn:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -236,12 +240,12 @@ local function makeMediaDropdown(parent, label, key, mediaType, x, y, width)
     popup:SetSize(popupW, POPUP_ITEM_H * POPUP_VISIBLE + 12)
     popup:SetBackdrop({
         bgFile   = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-        edgeSize = 14,
-        insets   = { left = 4, right = 4, top = 4, bottom = 4 },
+        edgeFile = "Interface\\Buttons\\WHITE8x8",
+        edgeSize = 1,
+        insets   = { left = 1, right = 1, top = 1, bottom = 1 },
     })
-    popup:SetBackdropColor(0.04, 0.04, 0.06, 0.97)
-    popup:SetBackdropBorderColor(0.6, 0.6, 0.6, 1)
+    popup:SetBackdropColor(0.03, 0.03, 0.05, 0.98)
+    popup:SetBackdropBorderColor(0.4, 0.4, 0.45, 1)
     popup:Hide()
     popup:EnableMouse(true)
 
@@ -360,40 +364,33 @@ local function makeColorPicker(parent, label, dbKey, x, y)
         lab:SetText(label)
     end
 
-    local btn = CreateFrame("Button", nil, parent, "BackdropTemplate")
-    btn:SetSize(80, 22)
+    -- Modern compact swatch button: gold thin border + inner color swatch
+    local btn = CreateFrame("Button", nil, parent)
+    btn:SetSize(28, 22)
     if lab then
         btn:SetPoint("TOPLEFT", lab, "BOTTOMLEFT", 0, -2)
     else
         btn:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y)
     end
     btn:RegisterForClicks("AnyUp")
-    btn:SetBackdrop({
-        bgFile   = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Buttons\\WHITE8x8",
-        edgeSize = 1,
-    })
-    btn:SetBackdropBorderColor(0.5, 0.5, 0.5, 1)
 
-    -- Inner swatch (so the border highlight on hover stays visible)
+    local border = btn:CreateTexture(nil, "BACKGROUND")
+    border:SetAllPoints(btn)
+    border:SetColorTexture(0.55, 0.45, 0.10, 1)
+
     local swatch = btn:CreateTexture(nil, "ARTWORK")
-    swatch:SetPoint("TOPLEFT", btn, "TOPLEFT", 2, -2)
-    swatch:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", -22, 2)
+    swatch:SetPoint("TOPLEFT", btn, "TOPLEFT", 1, -1)
+    swatch:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", -1, 1)
     swatch:SetColorTexture(1, 1, 1, 1)
 
-    local hint = btn:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    hint:SetPoint("RIGHT", btn, "RIGHT", -4, 0)
-    hint:SetText("•••")
-    hint:SetTextColor(1, 0.82, 0)
-
     btn:SetScript("OnEnter", function(self)
-        self:SetBackdropBorderColor(1, 0.82, 0, 1)
+        border:SetColorTexture(1, 0.82, 0, 1)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         GameTooltip:AddLine(L["Click to choose a color"], 1, 1, 1)
         GameTooltip:Show()
     end)
     btn:SetScript("OnLeave", function(self)
-        self:SetBackdropBorderColor(0.5, 0.5, 0.5, 1)
+        border:SetColorTexture(0.55, 0.45, 0.10, 1)
         GameTooltip:Hide()
     end)
 
@@ -402,7 +399,6 @@ local function makeColorPicker(parent, label, dbKey, x, y)
     end
     local function refreshSwatch()
         local c = getColor()
-        btn:SetBackdropColor(0, 0, 0, 1) -- dark backdrop so swatch + border read clean
         swatch:SetVertexColor(c.r, c.g, c.b, c.a or 1)
     end
     btn.refresh = refreshSwatch
@@ -462,6 +458,59 @@ local function makeColorPicker(parent, label, dbKey, x, y)
     return btn
 end
 
+-- Section header with title + thin gold separator line.
+-- Both line endpoints MUST be anchored at the same vertical pixel — anchors that
+-- mix "header:RIGHT" (mid of header) with "parent:RIGHT" (mid of parent) produce
+-- a diagonal that renders as variable thickness or invisible.
+-- Solution: defer positioning by one tick, then anchor both endpoints to
+-- parent:TOPLEFT / parent:TOPRIGHT at the exact same y, with the line's left
+-- offset computed from the actual rendered header width.
+local function makeSection(parent, title, x, y)
+    local header = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    header:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y)
+    header:SetText(title)
+    header:SetTextColor(1, 0.82, 0)
+
+    local line = parent:CreateTexture(nil, "OVERLAY")
+    line:SetHeight(1)
+    line:SetColorTexture(1, 0.82, 0, 0.55)
+
+    local function place()
+        local w = header:GetStringWidth() or 0
+        line:ClearAllPoints()
+        line:SetPoint("TOPLEFT",  parent, "TOPLEFT",  x + w + 10, y - 7)
+        line:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -14,        y - 7)
+    end
+    place()
+    C_Timer.After(0, place)  -- re-run once layout pass has computed string width
+    return header
+end
+
+-- Hover tooltip helper. Hooks the widget AND any well-known child controls
+-- (slider thumb, steppers) so the tooltip shows everywhere on composite widgets.
+local function addTooltip(widget, text)
+    if not widget or not text or text == "" then return widget end
+    local function show(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine(text, 1, 1, 1, true)
+        GameTooltip:Show()
+    end
+    local function hide() GameTooltip:Hide() end
+
+    local function hook(f)
+        if not f or not f.HookScript then return end
+        f:HookScript("OnEnter", show)
+        f:HookScript("OnLeave", hide)
+    end
+
+    hook(widget)
+    -- MinimalSliderWithSteppersTemplate exposes Slider, Back, Forward children
+    hook(widget.Slider)
+    hook(widget.Back)
+    hook(widget.Forward)
+    return widget
+end
+
 local function ANCHOR9()
     return {
         { text = L["Top Left"],     value = "TOPLEFT" },
@@ -480,21 +529,17 @@ end
 -- TABS
 -- ============================================================
 
-local function makeTab(parent, id, label, idx)
-    local tab = CreateFrame("Button", "BWTab"..id, parent, "BackdropTemplate")
-    tab:SetSize(64, 22)
-    tab:SetPoint("TOPLEFT", parent, "TOPLEFT", 8 + (idx - 1) * 68, -28)
-    tab:SetBackdrop({
-        bgFile = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Buttons\\WHITE8x8",
-        edgeSize = 1,
-    })
-    tab:SetBackdropColor(0.12, 0.12, 0.14, 1)
-    tab:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
-    local text = tab:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    text:SetPoint("CENTER")
-    text:SetText(label)
-    tab.text = text
+local function makeTab(parent, id, label, idx, prevTab)
+    -- Bottom-anchored tab (like Auction House / Profession panels)
+    local tab = CreateFrame("Button", "BWTab"..id, parent, "PanelTabButtonTemplate")
+    tab:SetText(label)
+    tab.id = id
+    if PanelTemplates_TabResize then PanelTemplates_TabResize(tab, 0) end
+    if prevTab then
+        tab:SetPoint("LEFT", prevTab, "RIGHT", 2, 0)
+    else
+        tab:SetPoint("TOPLEFT", parent, "BOTTOMLEFT", 12, 2)
+    end
     tab.id = id
     return tab
 end
@@ -504,11 +549,16 @@ end
 -- ============================================================
 
 local function buildLayoutPage(page)
-    local y = -10
+    local y = -8
+
+    -- ============ GENERAL ============
+    makeSection(page, L["General"], 14, y); y = y - 22
+
     local btnMover = CreateFrame("Button", nil, page, "UIPanelButtonTemplate")
     btnMover:SetSize(160, 22); btnMover:SetPoint("TOPLEFT", 14, y)
     btnMover:SetText(L["Unlock / Lock Mover"])
     btnMover:SetScript("OnClick", function() BW:ToggleMover() end)
+    addTooltip(btnMover, L["Toggle a draggable handle on the boss frames container so you can move it on screen."])
 
     local label = page:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     label:SetPoint("TOPLEFT", 184, y - 4)
@@ -526,11 +576,7 @@ local function buildLayoutPage(page)
     local function refreshTestBtns()
         local n = currentTestCount()
         for i, b in ipairs(testBtns) do
-            if b._count == n then
-                b:LockHighlight()
-            else
-                b:UnlockHighlight()
-            end
+            if b._count == n then b:LockHighlight() else b:UnlockHighlight() end
         end
     end
 
@@ -541,20 +587,24 @@ local function buildLayoutPage(page)
         b:SetPoint("TOPLEFT", xs, y)
         b:SetText(count == 0 and L["Off"] or tostring(count))
         b._count = count
-        b:SetScript("OnClick", function()
-            BW:SetTestMode(count)
-            refreshTestBtns()
-        end)
+        b:SetScript("OnClick", function() BW:SetTestMode(count); refreshTestBtns() end)
+        addTooltip(b, count == 0 and L["Stop the simulation."]
+            or format(L["Simulate %d boss frame(s) with fake HP, casts and auras."], count))
         testBtns[#testBtns + 1] = b
         xs = xs + 38
     end
     refreshTestBtns()
 
     y = y - 30
-    makeCheck(page, L["Enable"], "enabled", 14, y); makeCheck(page, L["Hide Blizzard"], "hideBlizzard", 184, y)
+    addTooltip(makeCheck(page, L["Enable"], "enabled", 14, y),
+        L["Master switch for the addon. When off, BossWatch frames stay hidden."])
+    addTooltip(makeCheck(page, L["Hide Blizzard"], "hideBlizzard", 184, y),
+        L["Hide the default Blizzard boss frames."])
 
     -- Minimap icon checkbox (account-wide, not per-profile)
-    local cbMini = CreateFrame("CheckButton", "BWOpt_minimapIcon", page, "InterfaceOptionsCheckButtonTemplate")
+    local cbMini = CreateFrame("CheckButton", "BWOpt_minimapIcon", page, "UICheckButtonTemplate")
+    cbMini:SetSize(24, 24)
+    cbMini.Text:SetFontObject("GameFontHighlight")
     cbMini:SetPoint("TOPLEFT", page, "TOPLEFT", 360, y)
     cbMini.Text:SetText(L["Show minimap icon"])
     cbMini:SetChecked(BossWatchDB and BossWatchDB.minimap and not BossWatchDB.minimap.hide)
@@ -564,196 +614,333 @@ local function buildLayoutPage(page)
     cbMini.refresh = function()
         cbMini:SetChecked(BossWatchDB and BossWatchDB.minimap and not BossWatchDB.minimap.hide)
     end
+    addTooltip(cbMini, L["Show a minimap button to open the options. Left-click: options, right-click: toggle mover."])
 
-    y = y - 26
-    makeDropdown(page, L["Anchor"], "anchor", ANCHOR9(), 14, y); makeDropdown(page, L["Grow Direction"], "growDirection", {
+    -- Panel opacity (account-wide, not per-profile)
+    y = y - 32
+    local alphaSlider = CreateFrame("Frame", nil, page, "MinimalSliderWithSteppersTemplate")
+    alphaSlider:SetWidth(220)
+    alphaSlider:SetPoint("TOPLEFT", page, "TOPLEFT", 14, y)
+    local function fmtPct(v) return string.format("%d%%", math.floor(v * 100 + 0.5)) end
+    local alphaFormatters = {
+        [MinimalSliderWithSteppersMixin.Label.Min] = function() return "20%" end,
+        [MinimalSliderWithSteppersMixin.Label.Max] = function() return "100%" end,
+        [MinimalSliderWithSteppersMixin.Label.Top] = function(v)
+            return L["Panel opacity"] .. ": " .. fmtPct(v)
+        end,
+    }
+    BossWatchDB = BossWatchDB or {}
+    if BossWatchDB.panelAlpha == nil then BossWatchDB.panelAlpha = 0.8 end
+    alphaSlider:Init(BossWatchDB.panelAlpha, 0.2, 1.0, 16, alphaFormatters)
+    local alphaEvent = (MinimalSliderWithSteppersMixin.Event
+        and MinimalSliderWithSteppersMixin.Event.OnValueChanged) or "OnValueChanged"
+    alphaSlider:RegisterCallback(alphaEvent, function(_, v)
+        v = math.floor(v * 20 + 0.5) / 20
+        BossWatchDB.panelAlpha = v
+        if panel then panel:SetAlpha(v) end
+    end, alphaSlider)
+    addTooltip(alphaSlider, L["Opacity of this options window. Saved account-wide."])
+
+    -- ============ POSITION ============
+    y = y - 60
+    makeSection(page, L["Position"], 14, y); y = y - 24
+
+    addTooltip(makeDropdown(page, L["Anchor"], "anchor", ANCHOR9(), 14, y),
+        L["Anchor point on the screen used as origin for the X/Y offsets."])
+    addTooltip(makeDropdown(page, L["Grow Direction"], "growDirection", {
         { text = L["Down"], value = "DOWN" }, { text = L["Up"], value = "UP" },
-    }, 184, y)
-    y = y - 50
-    makeSlider(page, L["Offset X"], "anchorX", -1500, 1500, 1, 14, y)
-    makeSlider(page, L["Offset Y"], "anchorY", -1500, 1500, 1, 260, y)
-    y = y - 50
-    makeSlider(page, L["Width"],   "frameWidth",   100, 400, 1, 14, y)
-    makeSlider(page, L["Height"],  "frameHeight",   20, 100, 1, 260, y)
-    y = y - 50
-    makeSlider(page, L["Spacing"], "frameSpacing",  0,  40, 1,  14, y)
-    makeSlider(page, L["Scale"],   "frameScale",  0.5, 2.0, 0.05, 260, y)
-    y = y - 50
-    makeDropdown(page, L["Portrait Position"], "portraitPosition", {
+    }, 184, y), L["Direction the additional boss frames stack from the first one."])
+    y = y - 56
+    addTooltip(makeSlider(page, L["Offset X"], "anchorX", -1500, 1500, 1, 14, y),
+        L["Horizontal offset from the anchor point."])
+    addTooltip(makeSlider(page, L["Offset Y"], "anchorY", -1500, 1500, 1, 260, y),
+        L["Vertical offset from the anchor point."])
+
+    -- ============ DIMENSIONS ============
+    y = y - 60
+    makeSection(page, L["Dimensions"], 14, y); y = y - 24
+
+    addTooltip(makeSlider(page, L["Width"],  "frameWidth",  100, 400, 1, 14, y),
+        L["Width of each boss frame in pixels."])
+    addTooltip(makeSlider(page, L["Height"], "frameHeight",  20, 100, 1, 260, y),
+        L["Height of each boss frame in pixels."])
+    y = y - 56
+    addTooltip(makeSlider(page, L["Spacing"], "frameSpacing", 0, 40, 1, 14, y),
+        L["Vertical gap between stacked boss frames."])
+    addTooltip(makeSlider(page, L["Scale"],  "frameScale", 0.5, 2.0, 0.05, 260, y),
+        L["Overall scale of all boss frames."])
+
+    -- ============ PORTRAIT ============
+    y = y - 60
+    makeSection(page, L["Portrait"], 14, y); y = y - 24
+
+    addTooltip(makeDropdown(page, L["Portrait Position"], "portraitPosition", {
         { text = L["Left"], value = "LEFT" },
         { text = L["Right"], value = "RIGHT" },
         { text = L["Hidden"], value = "HIDDEN" },
-    }, 14, y)
-    makeSlider(page, L["Portrait Size"], "portraitSize", 20, 80, 1, 260, y)
-end
+    }, 14, y), L["Where the boss portrait icon is shown on the frame."])
+    addTooltip(makeSlider(page, L["Portrait Size"], "portraitSize", 20, 80, 1, 260, y),
+        L["Size of the boss portrait icon in pixels."])
 
-local function buildBarsPage(page)
-    local y = -10
-    makeMediaDropdown(page, L["Health Texture"], "healthTexture", "statusbar", 14, y, 180)
-    y = y - 50
-    makeMediaDropdown(page, L["Power Texture"], "powerTexture", "statusbar", 14, y, 180)
-    y = y - 50
-    markAsNew(makeMediaDropdown(page, L["Background Texture"], "barBackgroundTexture", "statusbar", 14, y, 180), "barBackgroundTexture")
-    y = y - 50
-    makeCheck(page, L["Show Power Bar"], "showPowerBar", 14, y)
-    makeSlider(page, L["Power Bar Height"], "powerBarHeight", 2, 20, 1, 184, y)
-    y = y - 50
-    makeDropdown(page, L["Health Color"], "healthColorMode", {
-        { text = L["Reaction (Blizzard)"], value = "REACTION" },
-        { text = L["Class fallback"],      value = "CLASS_FALLBACK" },
-        { text = L["Custom static"],       value = "STATIC" },
-    }, 14, y, 180)
-    makeColorPicker(page, L["Static color"], "healthStaticColor", 260, y)
-    y = y - 50
-    markAsNew(makeSlider(page, L["Frame background alpha"], "frameBackgroundAlpha", 0, 1, 0.05, 14, y), "frameBackgroundAlpha")
-    makeSlider(page, L["HP background alpha"], "healthBackgroundAlpha", 0, 1, 0.05, 260, y)
-    y = y - 50
-    makeSlider(page, L["Power background alpha"], "powerBackgroundAlpha", 0, 1, 0.05, 14, y)
-    markAsNew(makeCheck(page, L["Frame bg wraps cast zone"], "frameBgWrapsCast", 260, y - 4), "frameBgWrapsCast")
-
+    -- ============ TARGET HIGHLIGHT ============
     y = y - 60
-    local th = page:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    th:SetPoint("TOPLEFT", 14, y)
-    th:SetText(L["Target Highlight"])
-    y = y - 22
+    makeSection(page, L["Target Highlight"], 14, y); y = y - 24
 
-    markAsNew(makeCheck(page, L["Highlight current target"], "targetHighlight", 14, y), "targetHighlight")
-    markAsNew(makeCheck(page, L["Animate (pulse)"], "targetHighlightAnimate", 184, y), "targetHighlightAnimate")
-    markAsNew(makeSlider(page, L["Thickness"], "targetHighlightThickness", 1, 6, 1, 354, y, 130), "targetHighlightThickness")
-    y = y - 30
+    addTooltip(markAsNew(makeCheck(page, L["Highlight current target"], "targetHighlight", 14, y), "targetHighlight"),
+        L["Add a colored border around the boss frame matching your current target."])
+    addTooltip(markAsNew(makeCheck(page, L["Animate (pulse)"], "targetHighlightAnimate", 184, y), "targetHighlightAnimate"),
+        L["Pulsing animation on the highlight border."])
+    addTooltip(markAsNew(makeSlider(page, L["Thickness"], "targetHighlightThickness", 1, 6, 1, 354, y, 130), "targetHighlightThickness"),
+        L["Border thickness of the highlight in pixels."])
+    y = y - 56
 
-    markAsNew(makeDropdown(page, L["Color mode"], "targetHighlightColorMode", {
+    addTooltip(markAsNew(makeDropdown(page, L["Color mode"], "targetHighlightColorMode", {
         { text = L["Static"],         value = "STATIC" },
         { text = L["Class color"],    value = "CLASS" },
         { text = L["Reaction"],       value = "REACTION" },
-    }, 14, y, 180), "targetHighlightColorMode")
-    markAsNew(makeColorPicker(page, L["Static color"], "targetHighlightColor", 260, y), "targetHighlightColor")
+    }, 14, y, 180), "targetHighlightColorMode"),
+        L["How the highlight border is colored: fixed color, target's class, or reaction."])
+    addTooltip(markAsNew(makeColorPicker(page, L["Static color"], "targetHighlightColor", 280, y), "targetHighlightColor"),
+        L["Fixed color used when the mode above is set to 'Static'."])
+end
+
+local function buildBarsPage(page)
+    local y = -8
+
+    -- ============ TEXTURES ============
+    makeSection(page, L["Textures"], 14, y); y = y - 24
+    addTooltip(makeMediaDropdown(page, L["Health Texture"], "healthTexture", "statusbar", 14, y, 180),
+        L["Status bar texture used for the boss health bar."])
+    y = y - 50
+    addTooltip(makeMediaDropdown(page, L["Power Texture"], "powerTexture", "statusbar", 14, y, 180),
+        L["Status bar texture used for the boss power (mana / rage / etc.) bar."])
+    y = y - 50
+    addTooltip(markAsNew(makeMediaDropdown(page, L["Background Texture"], "barBackgroundTexture", "statusbar", 14, y, 180), "barBackgroundTexture"),
+        L["Texture used behind the bars (the empty / dark portion)."])
+
+    -- ============ POWER BAR ============
+    y = y - 60
+    makeSection(page, L["Power Bar"], 14, y); y = y - 24
+    addTooltip(makeCheck(page, L["Show Power Bar"], "showPowerBar", 14, y),
+        L["Display the power bar below the health bar."])
+    addTooltip(makeSlider(page, L["Power Bar Height"], "powerBarHeight", 2, 20, 1, 184, y),
+        L["Height of the power bar in pixels."])
+
+    -- ============ HEALTH COLOR ============
+    y = y - 56
+    makeSection(page, L["Health Color"], 14, y); y = y - 24
+    addTooltip(makeDropdown(page, L["Color mode"], "healthColorMode", {
+        { text = L["Reaction (Blizzard)"], value = "REACTION" },
+        { text = L["Class fallback"],      value = "CLASS_FALLBACK" },
+        { text = L["Custom static"],       value = "STATIC" },
+    }, 14, y, 180), L["How the health bar is colored: by reaction (red/yellow/green), by class, or one fixed color."])
+    addTooltip(makeColorPicker(page, L["Static color"], "healthStaticColor", 280, y),
+        L["Fixed color used when the mode above is set to 'Custom static'."])
+
+    -- ============ BACKGROUND ALPHA ============
+    y = y - 56
+    makeSection(page, L["Background Alpha"], 14, y); y = y - 24
+    addTooltip(markAsNew(makeSlider(page, L["Frame background alpha"], "frameBackgroundAlpha", 0, 1, 0.05, 14, y), "frameBackgroundAlpha"),
+        L["Opacity of the dark frame backdrop behind everything."])
+    addTooltip(makeSlider(page, L["HP background alpha"], "healthBackgroundAlpha", 0, 1, 0.05, 260, y),
+        L["Opacity of the empty (un-filled) part of the health bar."])
+    y = y - 56
+    addTooltip(makeSlider(page, L["Power background alpha"], "powerBackgroundAlpha", 0, 1, 0.05, 14, y),
+        L["Opacity of the empty part of the power bar."])
+    addTooltip(markAsNew(makeCheck(page, L["Frame bg wraps cast zone"], "frameBgWrapsCast", 260, y), "frameBgWrapsCast"),
+        L["When on, the frame background extends down to include the cast bar area."])
+
 end
 
 local function buildCastPage(page)
-    local y = -10
-    makeMediaDropdown(page, L["Cast Bar Texture"], "castTexture", "statusbar", 14, y, 180)
-    y = y - 50
-    makeCheck(page, L["Show Cast Bar"], "showCastBar", 14, y)
-    makeCheck(page, L["Detached"], "castBarDetached", 184, y)
-    y = y - 26
-    makeSlider(page, L["Cast Bar Height"], "castBarHeight", 8, 40, 1, 14, y, 160)
-    makeDropdown(page, L["Icon Position"], "castBarIconPosition", {
+    local y = -8
+
+    -- ============ TEXTURE ============
+    makeSection(page, L["Texture"], 14, y); y = y - 24
+    addTooltip(makeMediaDropdown(page, L["Cast Bar Texture"], "castTexture", "statusbar", 14, y, 180),
+        L["Status bar texture used for the cast bar fill."])
+
+    -- ============ DISPLAY ============
+    y = y - 60
+    makeSection(page, L["Display"], 14, y); y = y - 24
+    addTooltip(makeCheck(page, L["Show Cast Bar"], "showCastBar", 14, y),
+        L["Show a cast bar under the boss frame when it's casting."])
+    addTooltip(makeCheck(page, L["Detached"], "castBarDetached", 184, y),
+        L["Detach the cast bar from the boss frame so you can place it anywhere on screen."])
+    y = y - 30
+    addTooltip(makeSlider(page, L["Cast Bar Height"], "castBarHeight", 8, 40, 1, 14, y, 160),
+        L["Height of the cast bar in pixels."])
+    addTooltip(makeDropdown(page, L["Icon Position"], "castBarIconPosition", {
         { text = L["Left"], value = "LEFT" }, { text = L["Right"], value = "RIGHT" },
-    }, 270, y)
-    y = y - 50
-    makeSlider(page, L["Cast bg alpha"], "castBackgroundAlpha", 0, 1, 0.05, 14, y)
-    y = y - 50
-    makeDropdown(page, L["Detached Anchor"], "castBarDetachedAnchor", ANCHOR9(), 14, y)
-    makeSlider(page, L["Detached Width (0=auto)"], "castBarDetachedWidth", 0, 400, 1, 260, y)
-    y = y - 50
-    makeSlider(page, L["Detached Offset X"], "castBarDetachedX", -200, 200, 1, 14, y)
-    makeSlider(page, L["Detached Offset Y"], "castBarDetachedY", -200, 200, 1, 260, y)
+    }, 270, y), L["Side of the cast bar where the spell icon is shown."])
+    y = y - 56
+    addTooltip(makeSlider(page, L["Cast bg alpha"], "castBackgroundAlpha", 0, 1, 0.05, 14, y),
+        L["Opacity of the cast bar's empty/background portion."])
+
+    -- ============ DETACHED POSITION ============
+    y = y - 60
+    makeSection(page, L["Detached Position"], 14, y); y = y - 24
+    addTooltip(makeDropdown(page, L["Detached Anchor"], "castBarDetachedAnchor", ANCHOR9(), 14, y),
+        L["Screen anchor used as origin when the cast bar is detached."])
+    addTooltip(makeSlider(page, L["Detached Width (0=auto)"], "castBarDetachedWidth", 0, 400, 1, 260, y),
+        L["Width of the detached cast bar. 0 keeps the boss frame width."])
+    y = y - 56
+    addTooltip(makeSlider(page, L["Detached Offset X"], "castBarDetachedX", -200, 200, 1, 14, y),
+        L["Horizontal offset from the detached anchor."])
+    addTooltip(makeSlider(page, L["Detached Offset Y"], "castBarDetachedY", -200, 200, 1, 260, y),
+        L["Vertical offset from the detached anchor."])
 end
 
 local function buildTextPage(page)
-    local y = -10
-    makeCheck(page, L["Show Name"], "showName", 14, y)
-    makeDropdown(page, L["Name Position"], "nameAnchor", ANCHOR9(), 184, y)
-    y = y - 50
-    makeSlider(page, L["Name Offset X"], "nameX", -80, 80, 1, 14, y)
-    makeSlider(page, L["Name Offset Y"], "nameY", -80, 80, 1, 260, y)
-    y = y - 50
-    makeSlider(page, L["Name max length (0=off)"], "nameMaxLength", 0, 40, 1, 14, y, 250)
-    y = y - 40
+    local y = -8
 
-    makeCheck(page, L["Show Health Text"], "showHealthText", 14, y)
-    makeDropdown(page, L["HP text position"], "healthTextAnchor", ANCHOR9(), 184, y)
-    y = y - 50
-    makeSlider(page, L["HP text Offset X"], "healthTextX", -80, 80, 1, 14, y)
-    makeSlider(page, L["HP text Offset Y"], "healthTextY", -80, 80, 1, 260, y)
-    y = y - 50
-    makeDropdown(page, L["HP format"], "healthTextFormat", {
+    local FORMATS = {
         { text = L["Percent (50%)"],     value = "PERCENT" },
-        { text = L["Current (50M)"],      value = "CURRENT" },
-        { text = L["Current + Percent"],  value = "CURRENT_PERCENT" },
-        { text = L["Current / Max"],      value = "CURRENT_MAX" },
-    }, 14, y, 200)
+        { text = L["Current (50M)"],     value = "CURRENT" },
+        { text = L["Current + Percent"], value = "CURRENT_PERCENT" },
+        { text = L["Current / Max"],     value = "CURRENT_MAX" },
+    }
 
-    y = y - 50
-    makeCheck(page, L["Show Power Text"], "showPowerText", 14, y)
-    makeDropdown(page, L["Power format"], "powerTextFormat", {
-        { text = L["Percent (50%)"],     value = "PERCENT" },
-        { text = L["Current (50M)"],      value = "CURRENT" },
-        { text = L["Current + Percent"],  value = "CURRENT_PERCENT" },
-        { text = L["Current / Max"],      value = "CURRENT_MAX" },
-    }, 184, y, 200)
+    -- ============ NAME ============
+    makeSection(page, L["Name"], 14, y); y = y - 24
+    addTooltip(makeCheck(page, L["Show Name"], "showName", 14, y),
+        L["Show the boss name on the frame."])
+    addTooltip(makeDropdown(page, L["Name Position"], "nameAnchor", ANCHOR9(), 184, y),
+        L["Anchor point where the name is attached on the frame."])
+    y = y - 56
+    addTooltip(makeSlider(page, L["Name Offset X"], "nameX", -80, 80, 1, 14, y),
+        L["Horizontal offset of the name from its anchor."])
+    addTooltip(makeSlider(page, L["Name Offset Y"], "nameY", -80, 80, 1, 260, y),
+        L["Vertical offset of the name from its anchor."])
+    y = y - 56
+    addTooltip(makeSlider(page, L["Name max length (0=off)"], "nameMaxLength", 0, 40, 1, 14, y, 250),
+        L["Trim the name after this many characters. 0 disables trimming."])
 
+    -- ============ HEALTH TEXT ============
     y = y - 60
-    local fontHeader = page:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    fontHeader:SetPoint("TOPLEFT", 14, y)
-    fontHeader:SetText(L["Font (applies to all text)"])
-    y = y - 18
-    makeMediaDropdown(page, L["Font"], "fontFace", "font", 14, y, 180)
-    y = y - 50
-    makeSlider(page, L["Font Size"], "fontSize", 8, 24, 1, 14, y)
-    makeDropdown(page, L["Outline"], "fontOutline", {
+    makeSection(page, L["Health Text"], 14, y); y = y - 24
+    addTooltip(makeCheck(page, L["Show Health Text"], "showHealthText", 14, y),
+        L["Display HP value as text on the health bar."])
+    addTooltip(makeDropdown(page, L["HP text position"], "healthTextAnchor", ANCHOR9(), 184, y),
+        L["Anchor point of the HP text on the bar."])
+    y = y - 56
+    addTooltip(makeSlider(page, L["HP text Offset X"], "healthTextX", -80, 80, 1, 14, y),
+        L["Horizontal offset of the HP text."])
+    addTooltip(makeSlider(page, L["HP text Offset Y"], "healthTextY", -80, 80, 1, 260, y),
+        L["Vertical offset of the HP text."])
+    y = y - 56
+    addTooltip(makeDropdown(page, L["HP format"], "healthTextFormat", FORMATS, 14, y, 200),
+        L["Format of the HP value: percent, current, both, or current/max."])
+
+    -- ============ POWER TEXT ============
+    y = y - 60
+    makeSection(page, L["Power Text"], 14, y); y = y - 24
+    addTooltip(makeCheck(page, L["Show Power Text"], "showPowerText", 14, y),
+        L["Display power value as text on the power bar."])
+    addTooltip(makeDropdown(page, L["Power format"], "powerTextFormat", FORMATS, 184, y, 200),
+        L["Format of the power value."])
+
+    -- ============ FONT ============
+    y = y - 60
+    makeSection(page, L["Font (applies to all text)"], 14, y); y = y - 24
+    addTooltip(makeMediaDropdown(page, L["Font"], "fontFace", "font", 14, y, 180),
+        L["Font used for every text on the boss frames."])
+    y = y - 56
+    addTooltip(makeSlider(page, L["Font Size"], "fontSize", 8, 24, 1, 14, y),
+        L["Base font size in points."])
+    addTooltip(makeDropdown(page, L["Outline"], "fontOutline", {
         { text = L["None"],          value = "NONE" },
         { text = L["Outline"],       value = "OUTLINE" },
         { text = L["Thick Outline"], value = "THICKOUTLINE" },
-    }, 260, y)
+    }, 260, y), L["Black outline drawn around text for readability."])
 end
 
 local function buildRaidMarkerPage(page)
-    local y = -10
-    makeCheck(page, L["Show Raid Target Icon"], "showRaidTargetIcon", 14, y)
-    y = y - 30
+    local y = -8
+
+    makeSection(page, L["Raid Target Icon"], 14, y); y = y - 24
+
     local note = page:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     note:SetPoint("TOPLEFT", 14, y)
-    note:SetWidth(520); note:SetJustifyH("LEFT")
+    note:SetWidth(680); note:SetJustifyH("LEFT")
     note:SetText(L["Position the raid target icon (skull, cross, star...) on each boss frame."])
+    y = y - 26
+
+    addTooltip(makeCheck(page, L["Show Raid Target Icon"], "showRaidTargetIcon", 14, y),
+        L["Display the raid target icon (if any) over each boss frame."])
     y = y - 30
-    makeDropdown(page, L["Anchor"], "raidTargetAnchor", ANCHOR9(), 14, y)
-    y = y - 50
-    makeSlider(page, L["Offset X"], "raidTargetX", -200, 200, 1, 14, y)
-    makeSlider(page, L["Offset Y"], "raidTargetY", -200, 200, 1, 260, y)
-    y = y - 50
-    makeSlider(page, L["Size"], "raidTargetSize", 10, 64, 1, 14, y)
-    makeSlider(page, L["Alpha"], "raidTargetAlpha", 0, 1, 0.05, 260, y)
+    addTooltip(makeDropdown(page, L["Anchor"], "raidTargetAnchor", ANCHOR9(), 14, y),
+        L["Anchor point of the raid icon on the frame."])
+    y = y - 56
+    addTooltip(makeSlider(page, L["Offset X"], "raidTargetX", -200, 200, 1, 14, y),
+        L["Horizontal offset of the raid icon."])
+    addTooltip(makeSlider(page, L["Offset Y"], "raidTargetY", -200, 200, 1, 260, y),
+        L["Vertical offset of the raid icon."])
+    y = y - 56
+    addTooltip(makeSlider(page, L["Size"], "raidTargetSize", 10, 64, 1, 14, y),
+        L["Size of the raid icon in pixels."])
+    addTooltip(makeSlider(page, L["Alpha"], "raidTargetAlpha", 0, 1, 0.05, 260, y),
+        L["Opacity of the raid icon."])
 end
 
 local function buildAurasPage(page)
-    local y = -10
-    makeCheck(page, L["Show Auras"], "showAuras", 14, y)
-    makeDropdown(page, L["Filter"], "aurasFilter", {
+    local y = -8
+
+    -- ============ FILTER ============
+    makeSection(page, L["Filter"], 14, y); y = y - 24
+    addTooltip(makeCheck(page, L["Show Auras"], "showAuras", 14, y),
+        L["Show buffs or debuffs on the boss frame."])
+    addTooltip(makeDropdown(page, L["Filter"], "aurasFilter", {
         { text = L["Debuffs (HARMFUL)"], value = "HARMFUL" },
         { text = L["Buffs (HELPFUL)"],   value = "HELPFUL" },
-    }, 184, y)
-    y = y - 50
-    makeDropdown(page, L["Source"], "aurasSource", {
+    }, 184, y), L["Which kind of auras to display: debuffs (HARMFUL) or buffs (HELPFUL)."])
+    y = y - 56
+    addTooltip(makeDropdown(page, L["Source"], "aurasSource", {
         { text = L["All (Blizzard-like)"], value = "ALL" },
         { text = L["Only mine"],           value = "MINE" },
         { text = L["Hide mine"],           value = "NOT_MINE" },
         { text = L["Boss-cast only"],      value = "BOSS_ONLY" },
-    }, 14, y, 180)
-    y = y - 50
-    makeSlider(page, L["Max Count"], "aurasMaxCount", 1, 8, 1, 14, y)
-    makeSlider(page, L["Size"], "aurasSize", 12, 48, 1, 260, y)
-    y = y - 50
-    makeSlider(page, L["Spacing"], "aurasSpacing", 0, 10, 1, 14, y)
-    y = y - 40
-    makeCheck(page, L["Show Stacks"], "aurasShowStacks", 14, y)
-    makeCheck(page, L["Show Timer"],  "aurasShowTimer",  184, y)
-    y = y - 26
-    makeDropdown(page, L["Anchor"], "aurasAnchor", ANCHOR9(), 14, y)
-    makeDropdown(page, L["Grow X"], "aurasGrowX", {
+    }, 14, y, 180), L["Filter by who applied the aura: anyone, only you, hide yours, or only boss-cast."])
+
+    -- ============ SIZE ============
+    y = y - 60
+    makeSection(page, L["Size"], 14, y); y = y - 24
+    addTooltip(makeSlider(page, L["Max Count"], "aurasMaxCount", 1, 8, 1, 14, y),
+        L["Maximum number of aura icons displayed per frame."])
+    addTooltip(makeSlider(page, L["Size"], "aurasSize", 12, 48, 1, 260, y),
+        L["Size of each aura icon in pixels."])
+    y = y - 56
+    addTooltip(makeSlider(page, L["Spacing"], "aurasSpacing", 0, 10, 1, 14, y),
+        L["Gap between aura icons in pixels."])
+
+    -- ============ LAYOUT ============
+    y = y - 60
+    makeSection(page, L["Layout"], 14, y); y = y - 24
+    addTooltip(makeDropdown(page, L["Anchor"], "aurasAnchor", ANCHOR9(), 14, y),
+        L["Where the aura row attaches on the boss frame."])
+    addTooltip(makeDropdown(page, L["Grow X"], "aurasGrowX", {
         { text = L["Left"],  value = "LEFT" },
         { text = L["Right"], value = "RIGHT" },
-    }, 260, y)
-    y = y - 50
-    makeSlider(page, L["Offset X"], "aurasX", -200, 200, 1, 14, y)
-    makeSlider(page, L["Offset Y"], "aurasY", -200, 200, 1, 260, y)
-    y = y - 50
-    makeDropdown(page, L["Timer Placement"], "aurasTimerPlacement", {
+    }, 260, y), L["Direction the icons stack horizontally from the anchor."])
+    y = y - 56
+    addTooltip(makeSlider(page, L["Offset X"], "aurasX", -200, 200, 1, 14, y),
+        L["Horizontal offset of the aura row."])
+    addTooltip(makeSlider(page, L["Offset Y"], "aurasY", -200, 200, 1, 260, y),
+        L["Vertical offset of the aura row."])
+
+    -- ============ DISPLAY ============
+    y = y - 60
+    makeSection(page, L["Display"], 14, y); y = y - 24
+    addTooltip(makeCheck(page, L["Show Stacks"], "aurasShowStacks", 14, y),
+        L["Display aura stack count when applicable."])
+    addTooltip(makeCheck(page, L["Show Timer"],  "aurasShowTimer",  184, y),
+        L["Display the remaining duration on the icon."])
+    y = y - 30
+    addTooltip(makeDropdown(page, L["Timer Placement"], "aurasTimerPlacement", {
         { text = L["Inside (centered)"], value = "INSIDE" },
         { text = L["Below icon"],        value = "BELOW" },
         { text = L["Above icon"],        value = "ABOVE" },
-    }, 14, y)
+    }, 14, y), L["Where the timer text is positioned relative to the icon."])
 end
 
 -- ============================================================
@@ -802,27 +989,21 @@ local function buildProfilesPage(page)
     labelFS:SetPoint("TOPLEFT", 14, y)
     labelFS:SetText(L["Active profile"])
 
-    local dd = CreateFrame("Frame", "BWOpt_DD_activeProfile", page, "UIDropDownMenuTemplate")
-    dd:SetPoint("TOPLEFT", labelFS, "BOTTOMLEFT", -18, -2)
-    UIDropDownMenu_SetWidth(dd, 200)
+    local dd = CreateFrame("DropdownButton", "BWOpt_DD_activeProfile", page, "WowStyle1DropdownTemplate")
+    dd:SetPoint("TOPLEFT", labelFS, "BOTTOMLEFT", 0, -2)
+    dd:SetWidth(220)
 
-    UIDropDownMenu_Initialize(dd, function()
+    dd:SetupMenu(function(_, rootDescription)
         for _, name in ipairs(BW:ListProfiles()) do
-            local info = UIDropDownMenu_CreateInfo()
-            info.text = name
-            info.value = name
-            info.checked = (name == BW:GetActiveProfileName())
-            info.func = function()
-                BW:SetActiveProfile(name)
-                UIDropDownMenu_SetText(dd, name)
-                if panel and panel.refreshAll then panel.refreshAll() end
-            end
-            UIDropDownMenu_AddButton(info)
+            rootDescription:CreateRadio(name,
+                function() return name == BW:GetActiveProfileName() end,
+                function()
+                    BW:SetActiveProfile(name)
+                    if panel and panel.refreshAll then panel.refreshAll() end
+                end)
         end
     end)
-    profileDropdownRefresh = function()
-        UIDropDownMenu_SetText(dd, BW:GetActiveProfileName())
-    end
+    profileDropdownRefresh = function() dd:GenerateMenu() end
     profileDropdownRefresh()
 
     y = y - 56
@@ -1017,8 +1198,11 @@ local function buildAboutPage(page)
     cmds:SetWidth(520); cmds:SetJustifyH("LEFT"); cmds:SetSpacing(3)
     cmds:SetText(
         "|cffffff00/bw|r — " .. L["open options"] .. "\n" ..
+        "|cffffff00/bw config|r |cff888888(" .. L["alias"] .. ")|r — " .. L["open options"] .. "\n" ..
+        "|cffffff00/bw options|r |cff888888(" .. L["alias"] .. ")|r — " .. L["open options"] .. "\n" ..
         "|cffffff00/bw mover|r — " .. L["toggle mover"] .. "\n" ..
         "|cffffff00/bw test N|r — " .. L["simulate N bosses (0-5)"] .. "\n" ..
+        "|cffffff00/bw test 0|r — " .. L["stop the simulation"] .. "\n" ..
         "|cffffff00/bw reset|r — " .. L["reset all settings + reload"]
     )
 
@@ -1032,8 +1216,9 @@ end
 -- ============================================================
 
 local function build()
-    panel = CreateFrame("Frame", "BossWatchOptions", UIParent, "BasicFrameTemplateWithInset")
-    panel:SetSize(560, 540)
+    -- Modern Blizzard 11.0 portrait frame (used by Item Upgrades, Adventure Guide, etc.)
+    panel = CreateFrame("Frame", "BossWatchOptions", UIParent, "PortraitFrameTemplate")
+    panel:SetSize(720, 620)
     panel:SetPoint("CENTER")
     panel:SetMovable(true); panel:EnableMouse(true)
     panel:RegisterForDrag("LeftButton")
@@ -1041,28 +1226,75 @@ local function build()
     panel:SetScript("OnDragStop", panel.StopMovingOrSizing)
     panel:SetFrameStrata("HIGH")
     panel:Hide()
-    panel.TitleText:SetText(L["BossWatch — Options"])
+    panel:SetClampedToScreen(true)
+    -- Close on Escape (Blizzard's UI special-frames list)
+    tinsert(UISpecialFrames, "BossWatchOptions")
 
-    local pageHolder = CreateFrame("Frame", nil, panel)
-    pageHolder:SetPoint("TOPLEFT", 4, -56)
-    pageHolder:SetPoint("BOTTOMRIGHT", -4, 4)
-
-    local pages = {}
-    local function newPage()
-        local p = CreateFrame("Frame", nil, pageHolder)
-        p:SetAllPoints(pageHolder)
-        p:Hide()
-        return p
+    if panel.SetTitle then panel:SetTitle(L["BossWatch — Options"]) end
+    if panel.SetPortraitToAsset then
+        panel:SetPortraitToAsset("Interface\\AddOns\\BossWatch\\logo.png")
     end
 
-    pages.layout   = newPage(); buildLayoutPage(pages.layout)
-    pages.bars     = newPage(); buildBarsPage(pages.bars)
-    pages.cast     = newPage(); buildCastPage(pages.cast)
-    pages.text     = newPage(); buildTextPage(pages.text)
-    pages.raid     = newPage(); buildRaidMarkerPage(pages.raid)
-    pages.auras    = newPage(); buildAurasPage(pages.auras)
-    pages.profiles = newPage(); buildProfilesPage(pages.profiles)
-    pages.about    = newPage(); buildAboutPage(pages.about)
+    local pageHolder = CreateFrame("Frame", nil, panel)
+    pageHolder:SetPoint("TOPLEFT", 8, -60)
+    pageHolder:SetPoint("BOTTOMRIGHT", -8, 8)
+
+    -- Panel opacity (account-wide preference) — slider lives in Disposition > General
+    BossWatchDB = BossWatchDB or {}
+    if BossWatchDB.panelAlpha == nil then BossWatchDB.panelAlpha = 0.8 end
+    panel:SetAlpha(BossWatchDB.panelAlpha)
+
+    local pages = {}
+    -- Each "page" is actually a ScrollFrame so long content scrolls cleanly.
+    -- Build functions receive the inner content frame as their parent.
+    local function newPage(name)
+        local sf = CreateFrame("ScrollFrame", "BWScroll_"..name, pageHolder, "UIPanelScrollFrameTemplate")
+        sf:SetPoint("TOPLEFT", pageHolder, "TOPLEFT", 0, 0)
+        sf:SetPoint("BOTTOMRIGHT", pageHolder, "BOTTOMRIGHT", -24, 0)
+        sf:Hide()
+
+        local content = CreateFrame("Frame", nil, sf)
+        content:SetSize(680, 900)
+        sf:SetScrollChild(content)
+        sf.content = content
+        return sf
+    end
+
+    -- Measure children + regions of content, set content height, hide scrollbar if content fits viewport
+    local function autoFitPage(sf)
+        C_Timer.After(0, function()
+            local content = sf.content
+            if not content or not content:GetTop() then return end
+            local top = content:GetTop()
+            local lowest = top
+            for _, child in ipairs({content:GetChildren()}) do
+                if child:IsShown() then
+                    local b = child:GetBottom()
+                    if b and b < lowest then lowest = b end
+                end
+            end
+            for _, region in ipairs({content:GetRegions()}) do
+                if region:IsShown() then
+                    local b = region:GetBottom()
+                    if b and b < lowest then lowest = b end
+                end
+            end
+            local used = math.max(50, top - lowest + 16)
+            local viewportH = sf:GetHeight()
+            content:SetHeight(math.max(used, viewportH))
+            local sb = sf.ScrollBar or _G[sf:GetName() .. "ScrollBar"]
+            if sb then sb:SetShown(used > viewportH + 1) end
+        end)
+    end
+
+    pages.layout   = newPage("layout");   buildLayoutPage(pages.layout.content);     autoFitPage(pages.layout)
+    pages.bars     = newPage("bars");     buildBarsPage(pages.bars.content);         autoFitPage(pages.bars)
+    pages.cast     = newPage("cast");     buildCastPage(pages.cast.content);         autoFitPage(pages.cast)
+    pages.text     = newPage("text");     buildTextPage(pages.text.content);         autoFitPage(pages.text)
+    pages.raid     = newPage("raid");     buildRaidMarkerPage(pages.raid.content);   autoFitPage(pages.raid)
+    pages.auras    = newPage("auras");    buildAurasPage(pages.auras.content);       autoFitPage(pages.auras)
+    pages.profiles = newPage("profiles"); buildProfilesPage(pages.profiles.content); autoFitPage(pages.profiles)
+    pages.about    = newPage("about");    buildAboutPage(pages.about.content);       autoFitPage(pages.about)
 
     local tabs = {
         { id = "layout",   label = L["Layout"] },
@@ -1080,19 +1312,15 @@ local function build()
         if pages[id] then pages[id]:Show() end
         for _, t in ipairs(tabBtns) do
             if t.id == id then
-                t:SetBackdropColor(0.25, 0.18, 0.05, 1)
-                t:SetBackdropBorderColor(1, 0.82, 0, 1)
-                t.text:SetTextColor(1, 0.82, 0)
+                if PanelTemplates_SelectTab then PanelTemplates_SelectTab(t) end
             else
-                t:SetBackdropColor(0.12, 0.12, 0.14, 1)
-                t:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
-                t.text:SetTextColor(0.8, 0.8, 0.8)
+                if PanelTemplates_DeselectTab then PanelTemplates_DeselectTab(t) end
             end
         end
     end
 
     for i, t in ipairs(tabs) do
-        local b = makeTab(panel, t.id, t.label, i)
+        local b = makeTab(panel, t.id, t.label, i, tabBtns[i - 1])
         b:SetScript("OnClick", function() selectTab(t.id) end)
         tabBtns[#tabBtns + 1] = b
     end
