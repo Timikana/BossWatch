@@ -158,8 +158,11 @@ end
 local POPUP_ITEM_H = 22
 local POPUP_VISIBLE = 12
 
-local function makeMediaDropdown(parent, label, key, mediaType, x, y, width)
+local function makeMediaDropdown(parent, label, key, mediaType, x, y, width, tint)
     width = width or 180
+    -- tint = {r,g,b} optional preview color. nil = no tint (show texture as-is).
+    local TR, TG, TB = 1, 1, 1
+    if tint then TR, TG, TB = tint[1] or 1, tint[2] or 1, tint[3] or 1 end
 
     local labelFS = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     labelFS:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y)
@@ -223,7 +226,7 @@ local function makeMediaDropdown(parent, label, key, mediaType, x, y, width)
             pcall(previewText.SetFont, previewText, BW:ResolveFont(name), 13, "")
         else
             previewTex:SetTexture(BW:ResolveTexture(name))
-            previewTex:SetVertexColor(1, 0.82, 0, 1)
+            previewTex:SetVertexColor(TR, TG, TB, 1)
         end
     end
 
@@ -321,7 +324,7 @@ local function makeMediaDropdown(parent, label, key, mediaType, x, y, width)
                 it.fs:SetText(name)
             else
                 it.bar:SetTexture(BW:ResolveTexture(name))
-                it.bar:SetVertexColor(1, 0.82, 0, 1)
+                it.bar:SetVertexColor(TR, TG, TB, 1)
                 it.nameFS:SetText(name)
             end
             it:SetScript("OnClick", function()
@@ -757,7 +760,7 @@ local function buildCastPage(page)
 
     -- ============ TEXTURE ============
     makeSection(page, L["Texture"], 14, y); y = y - 24
-    addTooltip(makeMediaDropdown(page, L["Cast Bar Texture"], "castTexture", "statusbar", 14, y, 180),
+    addTooltip(makeMediaDropdown(page, L["Cast Bar Texture"], "castTexture", "statusbar", 14, y, 180, {1, 0.82, 0}),
         L["Status bar texture used for the cast bar fill."])
 
     -- ============ DISPLAY ============
@@ -1129,12 +1132,29 @@ local function buildProfilesPage(page)
         showProfilePopup(L["Name for the imported profile:"], "", function(name)
             name = (name or ""):gsub("^%s+", ""):gsub("%s+$", "")
             if name == "" then return end
-            local ok, err = BW:ImportProfile(text, name)
+
+            local function doImport(overwrite)
+                local ok, err = BW:ImportProfile(text, name, overwrite)
+                if ok then
+                    BW:SetActiveProfile(name)
+                    profileDropdownRefresh()
+                    if panel and panel.refreshAll then panel.refreshAll() end
+                    print("|cffeda55fBossWatch:|r " .. format(L["profile '%s' imported"], name))
+                else
+                    print("|cffeda55fBossWatch:|r " .. L["import failed:"] .. " " .. tostring(err))
+                end
+            end
+
+            -- First try without overwrite; if name exists, prompt to overwrite.
+            local ok, err = BW:ImportProfile(text, name, false)
             if ok then
                 BW:SetActiveProfile(name)
                 profileDropdownRefresh()
                 if panel and panel.refreshAll then panel.refreshAll() end
                 print("|cffeda55fBossWatch:|r " .. format(L["profile '%s' imported"], name))
+            elseif err == "profile already exists" then
+                showConfirmPopup(format(L["Overwrite existing profile '%s'?"], name),
+                    function() doImport(true) end)
             else
                 print("|cffeda55fBossWatch:|r " .. L["import failed:"] .. " " .. tostring(err))
             end

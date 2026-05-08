@@ -182,6 +182,7 @@ L["Click a URL to select it, then Ctrl+C to copy."] =
 -- ============================================================
 L["Position"]           = "Posizione"
 L["Texture"]            = "Texture"
+L["Overwrite existing profile '%s'?"] = "Sovrascrivere il profilo esistente «%s»?"
 L["General"]            = "Generale"
 L["Dimensions"]         = "Dimensioni"
 L["Portrait"]           = "Ritratto"

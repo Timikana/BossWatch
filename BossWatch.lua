@@ -282,7 +282,7 @@ function BW:ExportProfile(name)
     return "BW1:" .. b64encode(body)
 end
 
-function BW:ImportProfile(text, newName)
+function BW:ImportProfile(text, newName, overwrite)
     if not text or text == "" then return false, "import box is empty" end
     text = text:gsub("^%s+", ""):gsub("%s+$", "")
     if text:sub(1, 4) ~= "BW1:" then return false, "invalid format" end
@@ -296,7 +296,9 @@ function BW:ImportProfile(text, newName)
     if not ok or type(profile) ~= "table" then return false, "invalid table" end
     if not newName or newName == "" then return false, "missing name" end
     ensureProfilesDB()
-    if BossWatchDB.profiles[newName] then return false, "profile already exists" end
+    if BossWatchDB.profiles[newName] and not overwrite then
+        return false, "profile already exists"
+    end
     BossWatchDB.profiles[newName] = profile
     return true
 end
