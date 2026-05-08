@@ -58,7 +58,10 @@ function BW.LayoutCastBar(frame, db)
     local cb = CreateCastBar(frame)
     cb:ClearAllPoints()
     cb:SetStatusBarTexture(BW:ResolveTexture(db.castTexture or db.healthTexture))
-    if cb.bg then cb.bg:SetColorTexture(0, 0, 0, db.castBackgroundAlpha or 0.7) end
+    if cb.bg then
+        cb.bg:SetTexture(BW:ResolveTexture(db.barBackgroundTexture or "Solid"))
+        cb.bg:SetVertexColor(0, 0, 0, db.castBackgroundAlpha or 0.7)
+    end
 
     local barH = db.castBarHeight or 14
     if cb.icon then
@@ -162,7 +165,8 @@ tickerFrame:SetScript("OnUpdate", function()
         if cb and cb:IsShown() then
             if cb._fadeOut then
                 local left = cb._fadeOut - now
-                if left <= 0 then cb:Hide(); cb._fadeOut = nil
+                if left <= 0 then
+                    cb:Hide(); cb._fadeOut = nil
                 else cb:SetAlpha(left / 0.6) end
             elseif cb._casting or cb._channeling then
                 cb:SetAlpha(1)

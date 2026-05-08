@@ -149,6 +149,44 @@ end
 -- ============================================================
 -- FRAME UPDATE
 -- ============================================================
+local TEST_CLASSES = { "WARRIOR", "MAGE", "WARLOCK", "DEATHKNIGHT", "DEMONHUNTER" }
+
+local function getHighlightColor(frame)
+    local db = BW:GetDB()
+    local mode = db.targetHighlightColorMode or "STATIC"
+    local fallback = db.targetHighlightColor or { r = 1, g = 0.82, b = 0, a = 1 }
+    local a = fallback.a or 1
+    local unit = frame and frame.unit
+    local isTest = frame and frame._testMode
+
+    if mode == "CLASS" then
+        local cls
+        if isTest then
+            cls = TEST_CLASSES[(frame.index - 1) % #TEST_CLASSES + 1]
+        elseif unit then
+            pcall(function() local _; _, cls = UnitClass(unit) end)
+        end
+        if cls and RAID_CLASS_COLORS and RAID_CLASS_COLORS[cls] then
+            local c = RAID_CLASS_COLORS[cls]
+            return c.r, c.g, c.b, a
+        end
+    elseif mode == "REACTION" then
+        if isTest then
+            return 1, 0.2, 0.2, a -- bosses are hostile in test mode
+        end
+        local reaction
+        if unit then
+            pcall(function() reaction = UnitReaction("player", unit) end)
+        end
+        if reaction then
+            if reaction >= 5 then return 0.2, 1, 0.2, a end       -- friendly
+            if reaction == 4 then return 1, 1, 0.2, a end          -- neutral
+            return 1, 0.2, 0.2, a                                  -- hostile
+        end
+    end
+    return fallback.r, fallback.g, fallback.b, a
+end
+
 local function applyTargetHighlight(frame)
     local hl = frame and frame.targetHighlight
     if not hl then return end
@@ -158,13 +196,13 @@ local function applyTargetHighlight(frame)
         hl:Hide()
         return
     end
-    local c = db.targetHighlightColor or { r = 1, g = 0.82, b = 0, a = 1 }
     local thick = db.targetHighlightThickness or 2
     pcall(hl.SetBackdrop, hl, {
         edgeFile = "Interface\\Buttons\\WHITE8x8",
         edgeSize = thick,
     })
-    hl:SetBackdropBorderColor(c.r, c.g, c.b, c.a or 1)
+    local r, g, b, a = getHighlightColor(frame)
+    hl:SetBackdropBorderColor(r, g, b, a)
     local isTarget = false
     if frame._fakeTarget then
         isTarget = true
@@ -355,17 +393,25 @@ local function ApplyLayout()
             end
         end
 
+        local bgTex = BW:ResolveTexture(db.barBackgroundTexture or "Solid")
         if f.healthBar then
             f.healthBar:SetStatusBarTexture(hpTex)
             if f.healthBar.bg then
-                f.healthBar.bg:SetColorTexture(0.1, 0.1, 0.1, db.healthBackgroundAlpha or 0.35)
+                f.healthBar.bg:SetTexture(bgTex)
+                f.healthBar.bg:SetVertexColor(0.1, 0.1, 0.1, db.healthBackgroundAlpha or 0.35)
             end
         end
         if f.powerBar then
             f.powerBar:SetStatusBarTexture(pwTex)
             if f.powerBar.bg then
-                f.powerBar.bg:SetColorTexture(0, 0, 0, db.powerBackgroundAlpha or 0.7)
+                f.powerBar.bg:SetTexture(bgTex)
+                f.powerBar.bg:SetVertexColor(0, 0, 0, db.powerBackgroundAlpha or 0.7)
             end
+        end
+        -- Frame-level bg also uses the chosen texture
+        if f.bg then
+            f.bg:SetTexture(bgTex)
+            f.bg:SetVertexColor(0, 0, 0, db.frameBackgroundAlpha or 0.6)
         end
 
         -- Portrait
@@ -452,6 +498,14 @@ local function ApplyLayout()
 
         if BW.LayoutCastBar then BW.LayoutCastBar(f, db) end
         if BW.LayoutAuras then BW.LayoutAuras(f, db) end
+        if BW._updateFrameBg then BW._updateFrameBg(f) end
+    end
+
+    -- Keep mover overlay in sync with portrait offsets if it's visible
+    if BW.BossContainer and BW.BossContainer._dragOverlay
+       and BW.BossContainer._dragOverlay:IsShown()
+       and BW._updateOverlayBounds then
+        BW._updateOverlayBounds(BW.BossContainer._dragOverlay, BW.BossContainer)
     end
 end
 BW.ApplyLayout = ApplyLayout
@@ -487,6 +541,7 @@ local function CreateBossFrame(index)
     local bg = f:CreateTexture(nil, "BACKGROUND")
     bg:SetAllPoints(f)
     bg:SetColorTexture(0, 0, 0, 0.6)
+    f.bg = bg
 
     -- Health bar
     local hp = CreateFrame("StatusBar", nil, f)
@@ -612,20 +667,55 @@ end
 -- ============================================================
 -- MOVER
 -- ============================================================
+-- Anchors the frame-level bg statically based on db.frameBgWrapsCast.
+-- When false, the bg stops above the cast zone so an idle cast bar shows
+-- through transparent — when true, bg covers the whole frame.
+function BW._updateFrameBg(frame)
+    if not frame or not frame.bg or not frame.powerBar or not frame.healthBar then return end
+    local db = BW:GetDB()
+    frame.bg:ClearAllPoints()
+    frame.bg:SetPoint("TOPLEFT",  frame, "TOPLEFT",  0, 0)
+    frame.bg:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 0, 0)
+    if db.frameBgWrapsCast or db.castBarDetached or not db.showCastBar then
+        -- Wraps everything (or there's no inline cast bar to skip)
+        frame.bg:SetPoint("BOTTOMLEFT",  frame, "BOTTOMLEFT",  0, 0)
+        frame.bg:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0, 0)
+    else
+        -- Stops above the cast zone — anchor to the bottom of the band that
+        -- covers HP + (optional) Power, which equals the bottom of power
+        -- bar if shown, else the bottom of the HP bar.
+        local bottomRef = (db.showPowerBar and frame.powerBar) or frame.healthBar
+        frame.bg:SetPoint("BOTTOMLEFT",  bottomRef, "BOTTOMLEFT",  0, 0)
+        frame.bg:SetPoint("BOTTOMRIGHT", bottomRef, "BOTTOMRIGHT", 0, 0)
+    end
+end
+
+local function updateOverlayBounds(o, c)
+    local db = BW:GetDB()
+    local pSize = (db.portraitPosition and db.portraitPosition ~= "HIDDEN") and (db.portraitSize or 0) or 0
+    local leftOff  = (db.portraitPosition == "LEFT")  and (pSize + 2) or 0
+    local rightOff = (db.portraitPosition == "RIGHT") and (pSize + 2) or 0
+    o:ClearAllPoints()
+    o:SetPoint("TOPLEFT",     c, "TOPLEFT",     -leftOff, 0)
+    o:SetPoint("BOTTOMRIGHT", c, "BOTTOMRIGHT", rightOff, 0)
+end
+BW._updateOverlayBounds = updateOverlayBounds
+
 local function ensureDragOverlay()
     local c = BW.BossContainer
     if c._dragOverlay then return c._dragOverlay end
-    local o = CreateFrame("Frame", nil, c)
+    local o = CreateFrame("Button", nil, c)
     o:SetFrameStrata("DIALOG")
-    o:SetAllPoints(c)
+    updateOverlayBounds(o, c)
     o:EnableMouse(true)
     o:RegisterForDrag("LeftButton")
+    o:RegisterForClicks("RightButtonUp")
     local tex = o:CreateTexture(nil, "OVERLAY")
     tex:SetAllPoints(o)
     tex:SetColorTexture(0, 1, 0, 0.18)
     local label = o:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     label:SetPoint("CENTER", o, "CENTER", 0, 0)
-    label:SetText("BossWatch — drag to move")
+    label:SetText("BossWatch — left-drag to move, right-click to lock")
     label:SetTextColor(1, 1, 1)
     o:SetScript("OnDragStart", function() c:StartMoving() end)
     o:SetScript("OnDragStop", function()
@@ -637,6 +727,9 @@ local function ensureDragOverlay()
         db.anchorY = y
         c:ClearAllPoints()
         c:SetPoint(point, UIParent, point, x, y)
+    end)
+    o:SetScript("OnClick", function(self, btn)
+        if btn == "RightButton" then BW:ToggleMover() end
     end)
     o:Hide()
     c._dragOverlay = o
@@ -659,13 +752,14 @@ function BW:ToggleMover()
         print("|cffeda55fBossWatch:|r mover locked")
     else
         c:SetMovable(true)
+        updateOverlayBounds(overlay, c)
         overlay:Show()
         c._movingEnabled = true
         if not anyVisible then
             BW:SetTestMode(3)
             c._autoTest = true
         end
-        print("|cffeda55fBossWatch:|r mover unlocked — drag the green overlay")
+        print("|cffeda55fBossWatch:|r mover unlocked — left-drag to move, right-click to lock")
     end
 end
 

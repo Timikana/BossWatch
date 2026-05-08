@@ -529,6 +529,8 @@ local function buildBarsPage(page)
     y = y - 50
     makeMediaDropdown(page, L["Power Texture"], "powerTexture", "statusbar", 14, y, 180)
     y = y - 50
+    makeMediaDropdown(page, L["Background Texture"], "barBackgroundTexture", "statusbar", 14, y, 180)
+    y = y - 50
     makeCheck(page, L["Show Power Bar"], "showPowerBar", 14, y)
     makeSlider(page, L["Power Bar Height"], "powerBarHeight", 2, 20, 1, 184, y)
     y = y - 50
@@ -539,8 +541,11 @@ local function buildBarsPage(page)
     }, 14, y, 180)
     makeColorPicker(page, L["Static color"], "healthStaticColor", 260, y)
     y = y - 50
-    makeSlider(page, L["HP background alpha"], "healthBackgroundAlpha", 0, 1, 0.05, 14, y)
-    makeSlider(page, L["Power background alpha"], "powerBackgroundAlpha", 0, 1, 0.05, 260, y)
+    makeSlider(page, L["Frame background alpha"], "frameBackgroundAlpha", 0, 1, 0.05, 14, y)
+    makeSlider(page, L["HP background alpha"], "healthBackgroundAlpha", 0, 1, 0.05, 260, y)
+    y = y - 50
+    makeSlider(page, L["Power background alpha"], "powerBackgroundAlpha", 0, 1, 0.05, 14, y)
+    makeCheck(page, L["Frame bg wraps cast zone"], "frameBgWrapsCast", 260, y - 4)
 
     y = y - 60
     local th = page:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -549,11 +554,16 @@ local function buildBarsPage(page)
     y = y - 22
 
     makeCheck(page, L["Highlight current target"], "targetHighlight", 14, y)
-    makeCheck(page, L["Animate (pulse)"], "targetHighlightAnimate", 260, y)
+    makeCheck(page, L["Animate (pulse)"], "targetHighlightAnimate", 184, y)
+    makeSlider(page, L["Thickness"], "targetHighlightThickness", 1, 6, 1, 354, y, 130)
     y = y - 30
 
-    makeColorPicker(page, L["Border color"], "targetHighlightColor", 14, y)
-    makeSlider(page, L["Border thickness"], "targetHighlightThickness", 1, 6, 1, 260, y)
+    makeDropdown(page, L["Color mode"], "targetHighlightColorMode", {
+        { text = L["Static"],         value = "STATIC" },
+        { text = L["Class color"],    value = "CLASS" },
+        { text = L["Reaction"],       value = "REACTION" },
+    }, 14, y, 180)
+    makeColorPicker(page, L["Static color"], "targetHighlightColor", 260, y)
 end
 
 local function buildCastPage(page)

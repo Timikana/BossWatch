@@ -25,6 +25,8 @@ BW.Defaults = {
 
     -- Health
     healthTexture = "Blizzard Raid Bar",
+    barBackgroundTexture = "Solid", -- LSM texture used behind HP / Power / Cast bars
+    frameBackgroundAlpha = 0.6,     -- alpha of the overall frame backdrop
     healthBackgroundAlpha = 0.35,
     healthColorMode = "REACTION", -- REACTION | CLASS_FALLBACK | STATIC
     healthStaticColor = {r = 0.8, g = 0.1, b = 0.1, a = 1},
@@ -36,6 +38,9 @@ BW.Defaults = {
     -- Cast
     castTexture = "Blizzard Modern",
     showCastBar = true, castBarHeight = 14, castBarDetached = false,
+    -- When false, the frame bg stops above the cast zone — that area is only
+    -- visible when an actual cast happens. When true, frame bg wraps everything.
+    frameBgWrapsCast = false,
     castBarIconPosition = "LEFT", castBackgroundAlpha = 0.7,
     castBarDetachedAnchor = "BOTTOM", castBarDetachedX = 0, castBarDetachedY = -4,
     castBarDetachedWidth = 0,
@@ -56,7 +61,8 @@ BW.Defaults = {
 
     -- Target highlight
     targetHighlight = true,
-    targetHighlightColor = { r = 1, g = 0.82, b = 0, a = 1 }, -- gold
+    targetHighlightColorMode = "STATIC", -- STATIC | CLASS | REACTION
+    targetHighlightColor = { r = 1, g = 0.82, b = 0, a = 1 }, -- gold (used in STATIC mode)
     targetHighlightAnimate = true,
     targetHighlightThickness = 2,
 
