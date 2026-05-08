@@ -1186,16 +1186,18 @@ local function buildAboutPage(page)
     end
 
     -- URL fields go BELOW the logo (logo ends at y=-154 with 14px margin + 140 height)
-    urlField(-170, L["GitHub repository:"], "https://github.com/Timikana/BossWatch")
-    urlField(-230, L["Report an issue:"],   "https://github.com/Timikana/BossWatch/issues")
+    urlField(-170, "|cffffffff" .. L["GitHub repository:"]   .. "|r", "https://github.com/Timikana/BossWatch")
+    urlField(-220, "|cffffffff" .. L["Report an issue:"]     .. "|r", "https://github.com/Timikana/BossWatch/issues")
+    urlField(-270, "|cffeda14a"  .. (L["CurseForge:"] or "CurseForge:") .. "|r", "https://www.curseforge.com/wow/addons/bosswatch")
+    urlField(-320, "|cffb371ff"  .. (L["Wago:"]       or "Wago:")       .. "|r", "https://addons.wago.io/addons/bosswatch")
 
     local cmdHeader = page:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    cmdHeader:SetPoint("TOPLEFT", 14, -290)
+    cmdHeader:SetPoint("TOPLEFT", 14, -380)
     cmdHeader:SetText(L["Slash commands"])
 
     local cmds = page:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     cmds:SetPoint("TOPLEFT", cmdHeader, "BOTTOMLEFT", 0, -6)
-    cmds:SetWidth(520); cmds:SetJustifyH("LEFT"); cmds:SetSpacing(3)
+    cmds:SetWidth(680); cmds:SetJustifyH("LEFT"); cmds:SetSpacing(3)
     cmds:SetText(
         "|cffffff00/bw|r — " .. L["open options"] .. "\n" ..
         "|cffffff00/bw config|r |cff888888(" .. L["alias"] .. ")|r — " .. L["open options"] .. "\n" ..
