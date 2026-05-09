@@ -323,3 +323,11 @@ L["Click to select, then Ctrl+C to copy."]                                      
 L["Export string for the active profile. Click Select All then Ctrl+C to copy."]     = "Export-Zeichenkette des aktiven Profils. Auf Alles auswählen klicken, dann Strg+C."
 L["Paste a profile export string here, then click Import to create a new profile."]   = "Export-Zeichenkette hier einfügen und auf Importieren klicken, um ein neues Profil zu erstellen."
 L["Open the floating BossWatch options panel."]                                      = "Öffnet das schwebende BossWatch-Optionsfenster."
+
+-- SECTION HEADERS (UI reorg)
+L["Actions"]      = "Aktionen"
+L["Layout style"] = "Layout-Stil"
+L["Health"]       = "Leben"
+L["Power"]        = "Ressource"
+L["Background"]   = "Hintergrund"
+L["Spell Icon"]   = "Zauber-Symbol"
