@@ -635,31 +635,6 @@ local function buildLayoutPage(page)
     end
     addTooltip(cbMini, L["Show a minimap button to open the options. Left-click: options, right-click: toggle mover."])
 
-    -- Panel opacity (account-wide, not per-profile)
-    y = y - 32
-    local alphaSlider = CreateFrame("Frame", nil, page, "MinimalSliderWithSteppersTemplate")
-    alphaSlider:SetWidth(220)
-    alphaSlider:SetPoint("TOPLEFT", page, "TOPLEFT", 14, y)
-    local function fmtPct(v) return string.format("%d%%", math.floor(v * 100 + 0.5)) end
-    local alphaFormatters = {
-        [MinimalSliderWithSteppersMixin.Label.Min] = function() return "20%" end,
-        [MinimalSliderWithSteppersMixin.Label.Max] = function() return "100%" end,
-        [MinimalSliderWithSteppersMixin.Label.Top] = function(v)
-            return L["Panel opacity"] .. ": " .. fmtPct(v)
-        end,
-    }
-    BossWatchDB = BossWatchDB or {}
-    if BossWatchDB.panelAlpha == nil then BossWatchDB.panelAlpha = 0.8 end
-    alphaSlider:Init(BossWatchDB.panelAlpha, 0.2, 1.0, 16, alphaFormatters)
-    local alphaEvent = (MinimalSliderWithSteppersMixin.Event
-        and MinimalSliderWithSteppersMixin.Event.OnValueChanged) or "OnValueChanged"
-    alphaSlider:RegisterCallback(alphaEvent, function(_, v)
-        v = math.floor(v * 20 + 0.5) / 20
-        BossWatchDB.panelAlpha = v
-        if panel then panel:SetAlpha(v) end
-    end, alphaSlider)
-    addTooltip(alphaSlider, L["Opacity of this options window. Saved account-wide."])
-
     -- ============ LAYOUT STYLE ============
     y = y - 60
     makeSection(page, L["Layout style"], 14, y); y = y - 24
@@ -793,14 +768,15 @@ local function buildCastPage(page)
         L["Show a cast bar under the boss frame when it's casting."])
     addTooltip(makeCheck(page, L["Detached"], "castBarDetached", 184, y),
         L["Detach the cast bar from the boss frame so you can place it anywhere on screen."])
-    y = y - 30
+    y = y - 36
     addTooltip(makeMediaDropdown(page, L["Cast Bar Texture"], "castTexture", "statusbar", 14, y, 180, {1, 0.82, 0}),
         L["Status bar texture used for the cast bar fill."])
     addTooltip(markAsNew(makeSlider(page, L["Cast bar height"], "castBarHeight", 8, 40, 1, 260, y), "castBarHeight_dim"),
         L["Height of the cast bar in pixels."])
-    y = y - 56
+    y = y - 60
     addTooltip(makeSlider(page, L["Cast bg alpha"], "castBackgroundAlpha", 0, 1, 0.05, 14, y),
         L["Opacity of the cast bar's empty/background portion."])
+    y = y - 8
 
     -- ============ SPELL ICON ============
     y = y - 60
@@ -1259,8 +1235,32 @@ local function buildAboutPage(page)
     urlField(-320, "|cffb371ff"  .. (L["Wago:"]       or "Wago:")       .. "|r", "https://addons.wago.io/addons/bosswatch")
     urlField(-370, "|cff5865f2"  .. (L["Discord (support / bugs / suggestions):"] or "Discord (support / bugs / suggestions):") .. "|r", "https://discord.gg/uFmxwexQ4P")
 
+    -- Panel opacity (account-wide, not per-profile)
+    local alphaSlider = CreateFrame("Frame", nil, page, "MinimalSliderWithSteppersTemplate")
+    alphaSlider:SetWidth(220)
+    alphaSlider:SetPoint("TOPLEFT", page, "TOPLEFT", 14, -410)
+    local function fmtPct(v) return string.format("%d%%", math.floor(v * 100 + 0.5)) end
+    local alphaFormatters = {
+        [MinimalSliderWithSteppersMixin.Label.Min] = function() return "20%" end,
+        [MinimalSliderWithSteppersMixin.Label.Max] = function() return "100%" end,
+        [MinimalSliderWithSteppersMixin.Label.Top] = function(v)
+            return L["Panel opacity"] .. ": " .. fmtPct(v)
+        end,
+    }
+    BossWatchDB = BossWatchDB or {}
+    if BossWatchDB.panelAlpha == nil then BossWatchDB.panelAlpha = 0.8 end
+    alphaSlider:Init(BossWatchDB.panelAlpha, 0.2, 1.0, 16, alphaFormatters)
+    local alphaEvent = (MinimalSliderWithSteppersMixin.Event
+        and MinimalSliderWithSteppersMixin.Event.OnValueChanged) or "OnValueChanged"
+    alphaSlider:RegisterCallback(alphaEvent, function(_, v)
+        v = math.floor(v * 20 + 0.5) / 20
+        BossWatchDB.panelAlpha = v
+        if panel then panel:SetAlpha(v) end
+    end, alphaSlider)
+    addTooltip(alphaSlider, L["Opacity of this options window. Saved account-wide."])
+
     local cmdHeader = page:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    cmdHeader:SetPoint("TOPLEFT", 14, -440)
+    cmdHeader:SetPoint("TOPLEFT", 14, -460)
     cmdHeader:SetText(L["Slash commands"])
 
     local cmds = page:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
