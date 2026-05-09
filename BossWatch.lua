@@ -32,8 +32,15 @@ BW.Defaults = {
     healthStaticColor = {r = 0.8, g = 0.1, b = 0.1, a = 1},
 
     -- Power
-    showPowerBar = false, powerBarHeight = 6, powerBackgroundAlpha = 0.7,
+    showPowerBar = true, powerBarHeight = 6, powerBackgroundAlpha = 0.7,
     powerTexture = "Blizzard Raid Bar",
+
+    -- Absorbs / shields overlay on the health bar
+    -- Default color matches Blizzard's standard shield overlay (light cyan)
+    showAbsorbs = true,
+    absorbTexture = "Blizzard Raid Bar",
+    -- #FFEB3E80
+    absorbColor   = { r = 0xFF/0xFF, g = 0xEB/0xFF, b = 0x3E/0xFF, a = 0x80/0xFF },
 
     -- Cast
     castTexture = "Blizzard Modern",
@@ -47,17 +54,23 @@ BW.Defaults = {
 
     -- Name text
     showName = true, nameAnchor = "RIGHT", nameX = 1, nameY = 0, nameMaxLength = 16,
+    layoutBlocks = 3,  -- 3 = name overlaid on HP bar (compact), 4 = name on its own row above HP
 
     -- Health text
     showHealthText = true, healthTextAnchor = "LEFT", healthTextX = 0, healthTextY = 0,
-    healthTextFormat = "PERCENT",
+    healthTextFormat = "CURRENT",
+
+    -- How to format current/max numbers: "RAW" (Blizzard default render),
+    -- "K" (force thousands), "M" (force millions), "G" (force billions),
+    -- "AUTO" (smart pick via AbbreviateLargeNumbers).
+    numberScale = "AUTO",
 
     -- Font (applies to all text elements)
     fontFace = "Friz Quadrata TT", fontSize = 12, fontOutline = "NONE",
 
     -- Power text
     showPowerText = true, powerTextAnchor = "RIGHT", powerTextX = -2, powerTextY = 0,
-    powerTextFormat = "PERCENT",
+    powerTextFormat = "CURRENT",
 
     -- Target highlight
     targetHighlight = true,
