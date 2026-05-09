@@ -1240,7 +1240,7 @@ local function buildAboutPage(page)
     -- Panel opacity (account-wide, not per-profile)
     local alphaSlider = CreateFrame("Frame", nil, page, "MinimalSliderWithSteppersTemplate")
     alphaSlider:SetWidth(220)
-    alphaSlider:SetPoint("TOPLEFT", page, "TOPLEFT", 14, -410)
+    alphaSlider:SetPoint("TOPLEFT", page, "TOPLEFT", 14, -440)
     local function fmtPct(v) return string.format("%d%%", math.floor(v * 100 + 0.5)) end
     local alphaFormatters = {
         [MinimalSliderWithSteppersMixin.Label.Min] = function() return "20%" end,
@@ -1262,7 +1262,7 @@ local function buildAboutPage(page)
     addTooltip(alphaSlider, L["Opacity of this options window. Saved account-wide."])
 
     local cmdHeader = page:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    cmdHeader:SetPoint("TOPLEFT", 14, -460)
+    cmdHeader:SetPoint("TOPLEFT", 14, -500)
     cmdHeader:SetText(L["Slash commands"])
 
     local cmds = page:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
