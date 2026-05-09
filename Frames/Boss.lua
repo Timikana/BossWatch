@@ -11,6 +11,114 @@ local InCombatLockdown = InCombatLockdown
 local AbbreviateLargeNumbers = AbbreviateLargeNumbers or tostring
 local issecretvalue = _G.issecretvalue or function() return false end
 
+-- Format a NUMBER (non-secret) according to scale. Returns string.
+-- For secret values, returns nil — caller must fall back to SetFormattedText("%s", secret).
+local function formatNumber(value, mode)
+    if value == nil then return nil end
+    if issecretvalue(value) then return nil end
+    if type(value) ~= "number" then return tostring(value) end
+
+    mode = mode or "AUTO"
+    if mode == "RAW" then return format("%d", value) end
+    if mode == "K"   then return format("%.0fK", value / 1e3) end
+    if mode == "M"   then return format("%.1fM", value / 1e6) end
+    if mode == "G"   then return format("%.2fB", value / 1e9) end
+    -- AUTO: pick the magnitude that gives a readable value
+    if mode == "AUTO" then
+        local v = value
+        if v < 0 then v = -v end
+        if     v >= 1e9 then return format("%.2fB", value / 1e9)
+        elseif v >= 1e6 then return format("%.1fM", value / 1e6)
+        elseif v >= 1e4 then return format("%.0fK", value / 1e3)
+        else return format("%d", value) end
+    end
+    return format("%d", value)
+end
+
+-- Brute-force attempt: wrap EVERYTHING in pcall. If anywhere along the way
+-- a secret-string operation throws, we silently fail and return nil. Caller
+-- falls back to %s passthrough. This may succeed on some hostile bosses
+-- where Blizzard's __tostring happens to yield a non-secret string.
+local function tryAbbreviateSecret(value, mode)
+    local ok, result = pcall(function()
+        local s = format("%s", value)
+        if not s or s == "" then return nil end
+        local clean = s:gsub("[%s,]", "")
+        local digits, suffix = clean:match("^(%d+%.?%d*)([KkMmBbGgTt]?)$")
+        if not digits then return nil end
+        local n = tonumber(digits)
+        if not n then return nil end
+        local mult = 1
+        if     suffix == "K" or suffix == "k" then mult = 1e3
+        elseif suffix == "M" or suffix == "m" then mult = 1e6
+        elseif suffix == "B" or suffix == "b" or suffix == "G" or suffix == "g" then mult = 1e9
+        end
+        n = n * mult
+
+        if     mode == "K"    then return format("%.0fK", n / 1e3)
+        elseif mode == "M"    then return format("%.1fM", n / 1e6)
+        elseif mode == "G"    then return format("%.2fB", n / 1e9)
+        elseif mode == "AUTO" then
+            if     n >= 1e9 then return format("%.2fB", n / 1e9)
+            elseif n >= 1e6 then return format("%.1fM", n / 1e6)
+            elseif n >= 1e4 then return format("%.0fK", n / 1e3)
+            else return format("%d", n) end
+        elseif mode == "RAW"  then return s end
+        return nil
+    end)
+    if ok then return result end
+    return nil
+end
+
+-- Re-format the text already set on a FontString according to mode. Used
+-- after SetFormattedText("%s", secret) — sometimes Blizzard's render path
+-- untaints the result, letting us read GetText() and re-format.
+local function tryReformatFontString(fontString, mode)
+    if mode == "RAW" or not mode then return end
+    local ok, txt = pcall(fontString.GetText, fontString)
+    if not ok or not txt or issecretvalue(txt) then return end
+    -- Match number with optional K/M/B suffix, possibly with surrounding text
+    local pre, digits, suffix, post = txt:match("^(.-)(%d[%d,%.]*)([KkMmBbGgTt]?)(.*)$")
+    if not digits then return end
+    local clean = digits:gsub(",", "")
+    local n = tonumber(clean)
+    if not n then return end
+    local mult = 1
+    if     suffix == "K" or suffix == "k" then mult = 1e3
+    elseif suffix == "M" or suffix == "m" then mult = 1e6
+    elseif suffix == "B" or suffix == "b" or suffix == "G" or suffix == "g" then mult = 1e9
+    end
+    n = n * mult
+    local formatted
+    if     mode == "K"    then formatted = format("%.0fK", n / 1e3)
+    elseif mode == "M"    then formatted = format("%.1fM", n / 1e6)
+    elseif mode == "G"    then formatted = format("%.2fB", n / 1e9)
+    elseif mode == "AUTO" then
+        if     n >= 1e9 then formatted = format("%.2fB", n / 1e9)
+        elseif n >= 1e6 then formatted = format("%.1fM", n / 1e6)
+        elseif n >= 1e4 then formatted = format("%.0fK", n / 1e3)
+        else formatted = format("%d", n) end
+    end
+    if formatted then
+        fontString:SetText((pre or "") .. formatted .. (post or ""))
+    end
+end
+
+local function setNumberText(fontString, value, mode)
+    if value == nil then fontString:SetText(""); return end
+    if issecretvalue(value) then
+        -- Step 1: try parse+reformat from %s output before setting text
+        local txt = tryAbbreviateSecret(value, mode)
+        if txt then fontString:SetText(txt); return end
+        -- Step 2: pass secret to FontString — Blizzard renders, then we re-read
+        -- the rendered text and reformat if it's no longer tainted.
+        pcall(fontString.SetFormattedText, fontString, "%s", value)
+        tryReformatFontString(fontString, mode)
+        return
+    end
+    fontString:SetText(formatNumber(value, mode) or "")
+end
+
 local MAX_BOSS = BW.MAX_BOSS
 
 local CLASS_COLORS = RAID_CLASS_COLORS or {}
@@ -57,18 +165,21 @@ end
 
 local function SetHealthValue(frame, unit)
     local pct = GetSafeHealthPercent(unit)
-    pcall(frame.healthBar.SetMinMaxValues, frame.healthBar, 0, 100)
-    pcall(frame.healthBar.SetValue, frame.healthBar, pct or 0)
+    frame.healthBar:SetMinMaxValues(0, 100)
+    frame.healthBar:SetValue(pct or 0)
     frame._hpPct = pct or 0
 end
 
+-- Restored from v0.4.8 — relies on pcall + AbbreviateLargeNumbers passthrough.
+-- On hostile bosses the secret-value crash inside AbbreviateLargeNumbers is
+-- caught silently and Blizzard's __tostring path fills the FontString instead.
 local function SetPowerValue(frame, unit)
     if not frame.powerBar or not frame.powerBar:IsShown() then return end
     local okP, p = pcall(UnitPower, unit)
     local okM, pMax = pcall(UnitPowerMax, unit)
     if not okP or not okM then return end
     local okCmp, hasPower = pcall(function() return pMax and pMax > 0 end)
-    if not okCmp or not hasPower then
+    if okCmp and not hasPower then
         frame.powerBar:Hide()
         if frame.powerText then frame.powerText:SetText("") end
         return
@@ -86,10 +197,16 @@ local function SetPowerValue(frame, unit)
         local tex = frame.powerBar:GetStatusBarTexture()
         local barW = frame.powerBar:GetWidth()
         if not tex or not barW or barW <= 0 then return 0 end
-        return (tex:GetWidth() or 0) / barW * 100
+        local ok, w = pcall(tex.GetWidth, tex)
+        if not ok or not w then return 0 end
+        local ok2, pct = pcall(function() return (w or 0) / barW * 100 end)
+        if ok2 then return pct end
+        return 0
     end
 
-    local fmt = db.powerTextFormat or "PERCENT"
+    -- Strip optional ".SCALE" suffix (e.g. "CURRENT.RAW" → "CURRENT")
+    local rawFmt = db.powerTextFormat or "PERCENT"
+    local fmt = rawFmt:match("^([^%.]+)") or rawFmt
     if fmt == "PERCENT" then
         frame.powerText:SetFormattedText("%d%%", visualPct())
     elseif fmt == "CURRENT" then
@@ -98,19 +215,40 @@ local function SetPowerValue(frame, unit)
         local okAbbr, pStr = pcall(AbbreviateLargeNumbers, p)
         if okAbbr then frame.powerText:SetFormattedText("%s (%d%%)", pStr, visualPct())
         else frame.powerText:SetFormattedText("%d%%", visualPct()) end
-    else
+    elseif fmt == "CURRENT_MAX" then
         pcall(frame.powerText.SetFormattedText, frame.powerText,
             "%s / %s", AbbreviateLargeNumbers(p), AbbreviateLargeNumbers(pMax))
+    elseif fmt == "RAW" then
+        pcall(frame.powerText.SetFormattedText, frame.powerText, "%s", p)
     end
 end
 
+-- Parse a format value like "CURRENT.AUTO" into ("CURRENT", "AUTO").
+-- Backwards compat: bare "CURRENT" → ("CURRENT", "AUTO").
+local function parseFormat(fmt)
+    if not fmt or fmt == "" then return "PERCENT", "AUTO" end
+    local kind, scale = fmt:match("^([^%.]+)%.(.+)$")
+    if not kind then return fmt, "AUTO" end
+    return kind, scale
+end
+
+-- v0.4.8 restored: relies on pcall + AbbreviateLargeNumbers passthrough.
+-- The Blizzard internal __tostring path renders K/M for valid magnitudes.
 local function FormatHealthText(frame, db, unit)
     if not frame.healthText then return end
     if not db.showHealthText then frame.healthText:SetText(""); return end
-    local fmt = db.healthTextFormat or "PERCENT"
+    -- Strip optional ".SCALE" suffix from legacy values like "CURRENT.RAW"
+    local fmt = (db.healthTextFormat or "PERCENT"):match("^([^%.]+)") or "PERCENT"
     local pct = frame._hpPct or 0
     if fmt == "PERCENT" then
         pcall(frame.healthText.SetFormattedText, frame.healthText, "%d%%", pct)
+    elseif fmt == "RAW" then
+        if frame._testMode then
+            frame.healthText:SetText(format("%d", (frame._testHp or 0) * 1e6))
+        else
+            local ok, hp = pcall(UnitHealth, unit)
+            if ok then pcall(frame.healthText.SetFormattedText, frame.healthText, "%s", hp) end
+        end
     elseif fmt == "CURRENT" then
         if frame._testMode then
             frame.healthText:SetText(AbbreviateLargeNumbers((frame._testHp or 0) * 1e6))
@@ -118,7 +256,9 @@ local function FormatHealthText(frame, db, unit)
             local ok, hp = pcall(UnitHealth, unit)
             if ok and type(hp) == "number" then
                 frame.healthText:SetText(AbbreviateLargeNumbers(hp))
-            else frame.healthText:SetText("") end
+            else
+                pcall(frame.healthText.SetText, frame.healthText, AbbreviateLargeNumbers(hp))
+            end
         end
     elseif fmt == "CURRENT_PERCENT" then
         if frame._testMode then
@@ -128,20 +268,9 @@ local function FormatHealthText(frame, db, unit)
             local ok, hp = pcall(UnitHealth, unit)
             if ok and type(hp) == "number" then
                 pcall(frame.healthText.SetFormattedText, frame.healthText, "%s (%d%%)", AbbreviateLargeNumbers(hp), pct)
+            else
+                pcall(frame.healthText.SetFormattedText, frame.healthText, "%s (%d%%)", AbbreviateLargeNumbers(hp), pct)
             end
-        end
-    else
-        if frame._testMode then
-            frame.healthText:SetFormattedText("%s / %s",
-                AbbreviateLargeNumbers((frame._testHp or 0) * 1e6),
-                AbbreviateLargeNumbers(1e8))
-        else
-            local ok1, hp = pcall(UnitHealth, unit)
-            local ok2, hpMax = pcall(UnitHealthMax, unit)
-            if ok1 and ok2 and type(hp) == "number" and type(hpMax) == "number" then
-                frame.healthText:SetFormattedText("%s / %s",
-                    AbbreviateLargeNumbers(hp), AbbreviateLargeNumbers(hpMax))
-            else frame.healthText:SetText("") end
         end
     end
 end
@@ -164,7 +293,8 @@ local function getHighlightColor(frame)
         if isTest then
             cls = TEST_CLASSES[(frame.index - 1) % #TEST_CLASSES + 1]
         elseif unit then
-            pcall(function() local _; _, cls = UnitClass(unit) end)
+            local _, c = UnitClass(unit)
+            if c and not issecretvalue(c) then cls = c end
         end
         if cls and RAID_CLASS_COLORS and RAID_CLASS_COLORS[cls] then
             local c = RAID_CLASS_COLORS[cls]
@@ -176,7 +306,8 @@ local function getHighlightColor(frame)
         end
         local reaction
         if unit then
-            pcall(function() reaction = UnitReaction("player", unit) end)
+            local r = UnitReaction("player", unit)
+            if r and not issecretvalue(r) then reaction = r end
         end
         if reaction then
             if reaction >= 5 then return 0.2, 1, 0.2, a end       -- friendly
@@ -197,7 +328,7 @@ local function applyTargetHighlight(frame)
         return
     end
     local thick = db.targetHighlightThickness or 2
-    pcall(hl.SetBackdrop, hl, {
+    hl:SetBackdrop({
         edgeFile = "Interface\\Buttons\\WHITE8x8",
         edgeSize = thick,
     })
@@ -207,7 +338,8 @@ local function applyTargetHighlight(frame)
     if frame._fakeTarget then
         isTarget = true
     else
-        pcall(function() isTarget = UnitIsUnit("target", frame.unit) end)
+        local v = UnitIsUnit("target", frame.unit)
+        if v ~= nil and not issecretvalue(v) then isTarget = v == true end
     end
     if isTarget and frame:IsShown() then
         hl:SetAlpha(1)
@@ -230,18 +362,22 @@ local function UpdateFrame(frame)
 
     -- Visibility driven by RegisterStateDriver — don't Show/Hide here.
 
-    -- Name
+    -- Name. Visual-width truncation via SetWidth works for both regular strings
+    -- and secret-tagged values (the renderer handles them internally).
     if frame.nameText then
         if db.showName then
-            local ok, n = pcall(UnitName, unit)
-            if not ok or not n then n = frame._testName or ("Boss " .. frame.index) end
+            local n = UnitName(unit) or frame._testName or ("Boss " .. (frame.index or "?"))
+            frame.nameText:SetWordWrap(false)
+            frame.nameText:SetMaxLines(1)
             local maxLen = db.nameMaxLength or 0
             if maxLen > 0 then
-                pcall(function()
-                    if #n > maxLen then n = n:sub(1, maxLen - 1) .. "…" end
-                end)
+                frame.nameText:SetWidth(maxLen * 7)
+            elseif db.layoutBlocks == 4 then
+                frame.nameText:SetWidth((frame.healthBar and frame.healthBar:GetWidth() or 200) - 8)
+            else
+                frame.nameText:SetWidth(0)
             end
-            pcall(frame.nameText.SetText, frame.nameText, n)
+            frame.nameText:SetText(n)
         else
             frame.nameText:SetText("")
         end
@@ -251,7 +387,18 @@ local function UpdateFrame(frame)
     if frame.portrait then
         if db.portraitPosition ~= "HIDDEN" then
             frame.portrait:Show()
-            SetPortraitTexture(frame.portrait, frame._testMode and "player" or unit)
+            if frame._testMode then
+                local TEST_PORTRAITS = {
+                    "Interface\\Icons\\Achievement_Boss_LichKing",
+                    "Interface\\Icons\\Achievement_Boss_KelThuzad_01",
+                    "Interface\\Icons\\Achievement_Boss_Onyxia",
+                    "Interface\\Icons\\Achievement_Boss_Ragnaros",
+                    "Interface\\Icons\\Achievement_Boss_Illidan",
+                }
+                frame.portrait:SetTexture(TEST_PORTRAITS[frame.index] or TEST_PORTRAITS[1])
+            else
+                SetPortraitTexture(frame.portrait, unit)
+            end
         else
             frame.portrait:Hide()
         end
@@ -259,25 +406,85 @@ local function UpdateFrame(frame)
 
     -- Health
     if frame._testMode then
-        pcall(frame.healthBar.SetMinMaxValues, frame.healthBar, 0, 100)
-        pcall(frame.healthBar.SetValue, frame.healthBar, frame._testHp or 80)
+        frame.healthBar:SetMinMaxValues(0, 100)
+        frame.healthBar:SetValue(frame._testHp or 80)
         frame._hpPct = frame._testHp or 80
     else
         SetHealthValue(frame, unit)
     end
     frame.healthBar:SetStatusBarColor(GetHealthColor(db, unit))
 
+    -- Absorb (TankWatch pattern): SetMinMax(0, hpMax) + SetValue(absorbAmount)
+    -- with SetReverseFill(true) → fills from the right edge by absorb/hpMax.
+    if frame.absorbBar then
+        if not db.showAbsorbs then
+            frame.absorbBar:Hide()
+        elseif frame._testMode then
+            local absAmount = frame._testAbsorb or 25
+            frame.absorbBar:SetMinMaxValues(0, 100)
+            frame.absorbBar:SetValue(absAmount)
+            frame.absorbBar:Show()
+        else
+            local max = UnitHealthMax(unit)
+            local absAmount
+            pcall(function() absAmount = UnitGetTotalAbsorbs and UnitGetTotalAbsorbs(unit) end)
+            local maxSecret = issecretvalue(max)
+            if not maxSecret and (not max or max <= 0) then
+                frame.absorbBar:Hide()
+            else
+                local hasAbs = false
+                if issecretvalue(absAmount) then hasAbs = true
+                elseif absAmount and absAmount > 0 then hasAbs = true end
+                if not hasAbs then
+                    frame.absorbBar:Hide()
+                else
+                    frame.absorbBar:SetMinMaxValues(0, max)
+                    pcall(frame.absorbBar.SetValue, frame.absorbBar, absAmount)
+                    frame.absorbBar:Show()
+                end
+            end
+        end
+    end
+
     -- Power
     if db.showPowerBar and frame.powerBar then
         frame.powerBar:Show()
         if frame._testMode then
-            local p = frame._testPower or 50
-            pcall(frame.powerBar.SetMinMaxValues, frame.powerBar, 0, 100)
-            pcall(frame.powerBar.SetValue, frame.powerBar, p)
-            frame.powerBar:SetStatusBarColor(0.3, 0.4, 0.9)
+            local pPct = frame._testPower or 50
+            frame.powerBar:SetMinMaxValues(0, 100)
+            frame.powerBar:SetValue(pPct)
+            -- Power types per test boss, themed to match lore:
+            -- 1 Lich King = Runic Power (cyan death-knight)
+            -- 2 Kel'Thuzad = Mana (lich/caster blue)
+            -- 3 Onyxia = Rage (dragon fury red)
+            -- 4 Ragnaros = Energy (fire-yellow)
+            -- 5 Illidan = Fury (demon hunter purple)
+            local TEST_POWER_COLORS = {
+                [1] = { 0.00, 0.85, 0.95 },  -- runic power
+                [2] = { 0.30, 0.45, 1.00 },  -- mana
+                [3] = { 1.00, 0.20, 0.20 },  -- rage
+                [4] = { 1.00, 0.95, 0.40 },  -- energy
+                [5] = { 0.65, 0.30, 1.00 },  -- fury
+            }
+            local c = TEST_POWER_COLORS[frame.index] or { 0.3, 0.4, 0.9 }
+            frame.powerBar:SetStatusBarColor(c[1], c[2], c[3])
             if frame.powerText then
                 if db.showPowerText then
-                    frame.powerText:SetFormattedText("%d%%", p + 0.5)
+                    -- Fake mana values for test: 100% = 250k mana
+                    local fakeMax = 250000
+                    local fakeCur = math.floor(fakeMax * pPct / 100)
+                    local rawFmt = db.powerTextFormat or "PERCENT"
+                    local fmt = rawFmt:match("^([^%.]+)") or rawFmt
+                    if fmt == "PERCENT" then
+                        frame.powerText:SetFormattedText("%d%%", pPct)
+                    elseif fmt == "CURRENT" or fmt == "RAW" then
+                        frame.powerText:SetText(AbbreviateLargeNumbers(fakeCur))
+                    elseif fmt == "CURRENT_PERCENT" then
+                        frame.powerText:SetFormattedText("%s (%d%%)", AbbreviateLargeNumbers(fakeCur), pPct)
+                    else
+                        frame.powerText:SetFormattedText("%s / %s",
+                            AbbreviateLargeNumbers(fakeCur), AbbreviateLargeNumbers(fakeMax))
+                    end
                 else frame.powerText:SetText("") end
             end
         else
@@ -321,25 +528,18 @@ function BW.UpdateRaidTargetIcon(frame)
     if frame._testMode then
         idx = frame.index
     else
-        local ok, v = pcall(GetRaidTargetIndex, unit)
-        if ok then idx = v end
+        idx = GetRaidTargetIndex(unit)
     end
-    if not idx then frame.raidTargetIcon:Hide(); return end
-    local applied
-    local ok = pcall(function()
-        if SetRaidTargetIconTexCoord then
-            SetRaidTargetIconTexCoord(frame.raidTargetIcon, idx)
-        elseif SetRaidTargetIconTexture then
-            SetRaidTargetIconTexture(frame.raidTargetIcon, idx)
-        end
-        applied = true
-    end)
-    local okZero, isZero = pcall(function() return idx == 0 end)
-    if ok and applied and not (okZero and isZero) then
-        frame.raidTargetIcon:Show()
-    else
+    if not idx or issecretvalue(idx) or idx == 0 then
         frame.raidTargetIcon:Hide()
+        return
     end
+    if SetRaidTargetIconTexCoord then
+        SetRaidTargetIconTexCoord(frame.raidTargetIcon, idx)
+    elseif SetRaidTargetIconTexture then
+        SetRaidTargetIconTexture(frame.raidTargetIcon, idx)
+    end
+    frame.raidTargetIcon:Show()
 end
 
 -- ============================================================
@@ -401,6 +601,11 @@ local function ApplyLayout()
                 f.healthBar.bg:SetVertexColor(0.1, 0.1, 0.1, db.healthBackgroundAlpha or 0.35)
             end
         end
+        if f.absorbBar then
+            f.absorbBar:SetStatusBarTexture(BW:ResolveTexture(db.absorbTexture or "Blizzard Raid Bar"))
+            local c = db.absorbColor or { r = 1, g = 0xEB/0xFF, b = 0x3E/0xFF, a = 0x80/0xFF }
+            f.absorbBar:SetStatusBarColor(c.r or 1, c.g or 0xEB/0xFF, c.b or 0x3E/0xFF, c.a or 0x80/0xFF)
+        end
         if f.powerBar then
             f.powerBar:SetStatusBarTexture(pwTex)
             if f.powerBar.bg then
@@ -447,9 +652,12 @@ local function ApplyLayout()
             f.powerBar:SetHeight(db.powerBarHeight)
         end
 
+        -- 4-block layout reserves a dedicated name row above the HP bar
+        local nameRowH = (db.layoutBlocks == 4) and 16 or 0
+
         f.healthBar:ClearAllPoints()
-        f.healthBar:SetPoint("TOPLEFT", f, "TOPLEFT", 0, 0)
-        f.healthBar:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, 0)
+        f.healthBar:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -nameRowH)
+        f.healthBar:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, -nameRowH)
         f.healthBar:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 0, castH + powerH)
         f.healthBar:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", 0, castH + powerH)
 
@@ -466,10 +674,16 @@ local function ApplyLayout()
         -- Name & health text
         if f.nameText then
             f.nameText:ClearAllPoints()
-            local a = db.nameAnchor
-            if not VALID_ANCHOR9[a] then a = "LEFT"; db.nameAnchor = a end
-            f.nameText:SetPoint(a, f.healthBar, a, db.nameX or 0, db.nameY or 0)
-            f.nameText:SetJustifyH(justifyOf(a))
+            if db.layoutBlocks == 4 then
+                -- Dedicated row above the HP bar, single CENTER anchor so SetWidth works
+                f.nameText:SetPoint("BOTTOM", f.healthBar, "TOP", 0, 1)
+                f.nameText:SetJustifyH("CENTER")
+            else
+                local a = db.nameAnchor
+                if not VALID_ANCHOR9[a] then a = "LEFT"; db.nameAnchor = a end
+                f.nameText:SetPoint(a, f.healthBar, a, db.nameX or 0, db.nameY or 0)
+                f.nameText:SetJustifyH(justifyOf(a))
+            end
         end
         if f.healthText then
             f.healthText:ClearAllPoints()
@@ -552,6 +766,22 @@ local function CreateBossFrame(index)
     hpBg:SetColorTexture(0.1, 0.1, 0.1, 0.5)
     hp.bg = hpBg
 
+    -- Absorb shield overlay (TankWatch pattern).
+    -- A StatusBar parented to hp, SetAllPoints, SetReverseFill(true) so its
+    -- fill grows from the RIGHT edge leftward. SetMinMaxValues(0, hpMax)
+    -- + SetValue(absorbAmount) gives a fill of (absorb/hpMax) of width, on
+    -- the right side. Frame level above hp.fill so the absorb is visible
+    -- where hp.fill doesn't reach.
+    local abs = CreateFrame("StatusBar", nil, hp)
+    abs:SetAllPoints(hp)
+    abs:SetStatusBarTexture("Interface\\RaidFrame\\Shield-Fill")
+    abs:SetMinMaxValues(0, 1)
+    abs:SetValue(0)
+    abs:SetReverseFill(true)
+    abs:SetFrameLevel(hp:GetFrameLevel() + 4)
+    abs:Hide()
+    f.absorbBar = abs
+
     -- Power bar
     local pw = CreateFrame("StatusBar", nil, f)
     pw:SetMinMaxValues(0, 100); pw:SetValue(0)
@@ -625,6 +855,7 @@ local function CreateBossFrame(index)
     -- Events
     f:RegisterEvent("UNIT_HEALTH")
     f:RegisterEvent("UNIT_MAXHEALTH")
+    f:RegisterEvent("UNIT_ABSORB_AMOUNT_CHANGED")
     f:RegisterEvent("UNIT_POWER_UPDATE")
     f:RegisterEvent("UNIT_MAXPOWER")
     f:RegisterEvent("UNIT_DISPLAYPOWER")
@@ -788,6 +1019,11 @@ testTicker:SetScript("OnUpdate", function(self, e)
             if f._testHp <= 10 then f._testHpDir = 1
             elseif f._testHp >= 100 then f._testHpDir = -1 end
             f._testPower = ((f._testPower or 50) + (math.random() * 4 - 2)) % 100
+            -- Absorb fluctuates between ~5 and ~45 to make the shield visibly move
+            f._testAbsorbDir = f._testAbsorbDir or 1
+            f._testAbsorb = (f._testAbsorb or 25) + f._testAbsorbDir * (0.4 + i * 0.15)
+            if f._testAbsorb <= 5 then f._testAbsorbDir = 1
+            elseif f._testAbsorb >= 45 then f._testAbsorbDir = -1 end
             if not _testNextCast[i] or now >= _testNextCast[i] then
                 if BW.SimulateCast then BW.SimulateCast(f, math.random() < 0.25) end
                 _testNextCast[i] = now + 3 + math.random() * 4
@@ -822,7 +1058,7 @@ function BW:SetTestMode(count)
     if count == _lastTestCount then return end
     _lastTestCount = count
 
-    local testNames = { "Archavon", "Onyxia", "Ragnaros", "Nefarian", "Deathwing" }
+    local testNames = { "The Lich King", "Kel'Thuzad", "Onyxia", "Ragnaros", "Illidan Stormrage" }
     local testHp = { 95, 72, 48, 30, 12 }
 
     for i = 1, MAX_BOSS do
@@ -834,13 +1070,14 @@ function BW:SetTestMode(count)
                 f._testHp = testHp[i]
                 f._testHpDir = -1
                 f._testPower = 50
+                f._testAbsorb = 18 + (i * 4)
                 if not InCombatLockdown() then
                     RegisterStateDriver(f, "visibility", "show")
                 end
                 UpdateFrame(f)
             else
                 f._testMode = false
-                f._testName = nil; f._testHp = nil; f._testHpDir = nil; f._testPower = nil
+                f._testName = nil; f._testHp = nil; f._testHpDir = nil; f._testPower = nil; f._testAbsorb = nil
                 f._testAuras = nil
                 f._fakeTarget = nil
                 _testNextCast[i] = nil
@@ -851,6 +1088,9 @@ function BW:SetTestMode(count)
             end
         end
     end
+
+    -- Trigger ApplyLayout so absorbBar width / textures are refreshed.
+    BW:RefreshAll()
 
     if count > 0 then
         testTicker:Show()

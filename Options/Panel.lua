@@ -11,10 +11,10 @@ local refresh = function() if BW.RefreshAll then BW:RefreshAll() end end
 -- "NEW" BADGE
 -- ============================================================
 local function markAsNew(widget, dbKey)
-    if not dbKey or not widget then return end
+    if not dbKey or not widget then return widget end
     BossWatchDB = BossWatchDB or {}
     BossWatchDB.seenFeatures = BossWatchDB.seenFeatures or {}
-    if BossWatchDB.seenFeatures[dbKey] then return end
+    if BossWatchDB.seenFeatures[dbKey] then return widget end
 
     -- Badge container
     local badge = CreateFrame("Frame", nil, widget, "BackdropTemplate")
@@ -69,6 +69,7 @@ local function markAsNew(widget, dbKey)
     elseif typ == "Slider" then
         widget:HookScript("OnValueChanged", clear)
     end
+    return widget
 end
 
 -- ============================================================
@@ -532,6 +533,17 @@ end
 -- TABS
 -- ============================================================
 
+local TAB_TOOLTIPS = {
+    layout   = L["Frame placement, dimensions, mover, test mode, target highlight."],
+    bars     = L["Health, power and absorb bar textures and colors."],
+    cast     = L["Cast bar texture, position, detached mode."],
+    text     = L["Name, HP, power text formats, and global font."],
+    raid     = L["Raid target icon (skull, cross, star...) display."],
+    auras    = L["Buffs and debuffs filtering, source, layout."],
+    profiles = L["Per-character profiles, import/export."],
+    about    = L["Version, links, slash commands."],
+}
+
 local function makeTab(parent, id, label, idx, prevTab)
     -- Bottom-anchored tab (like Auction House / Profession panels)
     local tab = CreateFrame("Button", "BWTab"..id, parent, "PanelTabButtonTemplate")
@@ -544,6 +556,7 @@ local function makeTab(parent, id, label, idx, prevTab)
         tab:SetPoint("TOPLEFT", parent, "BOTTOMLEFT", 12, 2)
     end
     tab.id = id
+    if TAB_TOOLTIPS[id] then addTooltip(tab, TAB_TOOLTIPS[id]) end
     return tab
 end
 
@@ -665,13 +678,24 @@ local function buildLayoutPage(page)
 
     addTooltip(makeSlider(page, L["Width"],  "frameWidth",  100, 400, 1, 14, y),
         L["Width of each boss frame in pixels."])
-    addTooltip(makeSlider(page, L["Height"], "frameHeight",  20, 100, 1, 260, y),
-        L["Height of each boss frame in pixels."])
+    addTooltip(makeSlider(page, L["Total height"], "frameHeight",  20, 120, 1, 260, y),
+        L["Total height of each boss frame in pixels. The HP bar fills whatever space is left after the power and cast bars."])
     y = y - 56
     addTooltip(makeSlider(page, L["Spacing"], "frameSpacing", 0, 40, 1, 14, y),
         L["Vertical gap between stacked boss frames."])
     addTooltip(makeSlider(page, L["Scale"],  "frameScale", 0.5, 2.0, 0.05, 260, y),
         L["Overall scale of all boss frames."])
+    y = y - 56
+    addTooltip(markAsNew(makeSlider(page, L["Power bar height"], "powerBarHeight", 2, 20, 1, 14, y), "powerBarHeight_dim"),
+        L["Height of the power bar in pixels (resource: mana, rage, energy, etc.)."])
+    addTooltip(markAsNew(makeSlider(page, L["Cast bar height"], "castBarHeight", 8, 40, 1, 260, y), "castBarHeight_dim"),
+        L["Height of the cast bar in pixels."])
+    y = y - 56
+    addTooltip(markAsNew(makeDropdown(page, L["Layout"], "layoutBlocks", {
+        { text = L["3 blocks (compact)"],     value = 3 },
+        { text = L["4 blocks (name on top)"], value = 4 },
+    }, 14, y, 200), "layoutBlocks"),
+        L["3 blocks: name is overlaid on the HP bar (compact). 4 blocks: name has its own dedicated row above the HP bar (more readable)."])
 
     -- ============ PORTRAIT ============
     y = y - 60
@@ -726,8 +750,17 @@ local function buildBarsPage(page)
     makeSection(page, L["Power Bar"], 14, y); y = y - 24
     addTooltip(makeCheck(page, L["Show Power Bar"], "showPowerBar", 14, y),
         L["Display the power bar below the health bar."])
-    addTooltip(makeSlider(page, L["Power Bar Height"], "powerBarHeight", 2, 20, 1, 184, y),
-        L["Height of the power bar in pixels."])
+
+    -- ============ ABSORBS ============
+    y = y - 56
+    makeSection(page, L["Absorbs"] .. " |cffff4040(" .. (L["Experimental"] or "Experimental") .. ")|r", 14, y); y = y - 24
+    addTooltip(markAsNew(makeCheck(page, L["Show absorbs / shields"], "showAbsorbs", 14, y), "showAbsorbs"),
+        L["Display incoming damage absorbs (shields, bubbles) as a translucent overlay extending the health bar. May not show on bosses with secret-tagged values."])
+    addTooltip(markAsNew(makeColorPicker(page, L["Absorb color"], "absorbColor", 280, y), "absorbColor"),
+        L["Color and opacity of the absorb overlay. Default matches Blizzard's standard shield cyan."])
+    y = y - 56
+    addTooltip(markAsNew(makeMediaDropdown(page, L["Absorb Texture"], "absorbTexture", "statusbar", 14, y, 180, {0.6, 0.82, 1}), "absorbTexture"),
+        L["Status bar texture used for the absorb overlay."])
 
     -- ============ HEALTH COLOR ============
     y = y - 56
@@ -771,13 +804,10 @@ local function buildCastPage(page)
     addTooltip(makeCheck(page, L["Detached"], "castBarDetached", 184, y),
         L["Detach the cast bar from the boss frame so you can place it anywhere on screen."])
     y = y - 30
-    addTooltip(makeSlider(page, L["Cast Bar Height"], "castBarHeight", 8, 40, 1, 14, y, 160),
-        L["Height of the cast bar in pixels."])
     addTooltip(makeDropdown(page, L["Icon Position"], "castBarIconPosition", {
         { text = L["Left"], value = "LEFT" }, { text = L["Right"], value = "RIGHT" },
-    }, 270, y), L["Side of the cast bar where the spell icon is shown."])
-    y = y - 56
-    addTooltip(makeSlider(page, L["Cast bg alpha"], "castBackgroundAlpha", 0, 1, 0.05, 14, y),
+    }, 14, y), L["Side of the cast bar where the spell icon is shown."])
+    addTooltip(makeSlider(page, L["Cast bg alpha"], "castBackgroundAlpha", 0, 1, 0.05, 260, y),
         L["Opacity of the cast bar's empty/background portion."])
 
     -- ============ DETACHED POSITION ============
@@ -798,10 +828,10 @@ local function buildTextPage(page)
     local y = -8
 
     local FORMATS = {
-        { text = L["Percent (50%)"],     value = "PERCENT" },
-        { text = L["Current (50M)"],     value = "CURRENT" },
-        { text = L["Current + Percent"], value = "CURRENT_PERCENT" },
-        { text = L["Current / Max"],     value = "CURRENT_MAX" },
+        { text = L["Percent (50%)"],         value = "PERCENT" },
+        { text = L["Raw (Blizzard native)"], value = "RAW" },
+        { text = L["Current"],               value = "CURRENT" },
+        { text = L["Current + Percent"],     value = "CURRENT_PERCENT" },
     }
 
     -- ============ NAME ============
@@ -817,7 +847,7 @@ local function buildTextPage(page)
         L["Vertical offset of the name from its anchor."])
     y = y - 56
     addTooltip(makeSlider(page, L["Name max length (0=off)"], "nameMaxLength", 0, 40, 1, 14, y, 250),
-        L["Trim the name after this many characters. 0 disables trimming."])
+        L["Visually clip the name to roughly this many characters (~7px each). 0 disables. Works on real bosses too — width-based, not string-based."])
 
     -- ============ HEALTH TEXT ============
     y = y - 60
@@ -833,15 +863,22 @@ local function buildTextPage(page)
         L["Vertical offset of the HP text."])
     y = y - 56
     addTooltip(makeDropdown(page, L["HP format"], "healthTextFormat", FORMATS, 14, y, 200),
-        L["Format of the HP value: percent, current, both, or current/max."])
+        L["How the HP value is displayed.\n\n|cffffd200Percent|r — uses UnitHealthPercent, always clean (50%).\n|cffffd200Raw|r — Blizzard native passthrough, may show K-prefixed or raw depending on magnitude.\n|cffffd200Current|r — Blizzard's AbbreviateLargeNumbers (K/M smart abbrev when applicable).\n|cffffd200Current + Percent|r — both combined.\n\nOn hostile boss frames, secret-tagged values limit what can be displayed; Blizzard's render is used as-is."])
 
     -- ============ POWER TEXT ============
     y = y - 60
     makeSection(page, L["Power Text"], 14, y); y = y - 24
     addTooltip(makeCheck(page, L["Show Power Text"], "showPowerText", 14, y),
         L["Display power value as text on the power bar."])
-    addTooltip(makeDropdown(page, L["Power format"], "powerTextFormat", FORMATS, 184, y, 200),
-        L["Format of the power value."])
+    -- Power on hostile bosses returns secret-tagged values: arithmetic and
+    -- abbreviation are blocked. Only Current (raw) via Blizzard %s passthrough
+    -- works reliably across all units. Percent is unreliable on secret-tagged
+    -- targets (texture width also secret) so we don't expose it for power.
+    local POWER_FORMATS = {
+        { text = L["Current (raw)"], value = "CURRENT.RAW" },
+    }
+    addTooltip(makeDropdown(page, L["Power format"], "powerTextFormat", POWER_FORMATS, 184, y, 200),
+        L["Format of the power value. On hostile bosses with secret-tagged values, only Percent and Current (raw) work."])
 
     -- ============ FONT ============
     y = y - 60
@@ -856,6 +893,7 @@ local function buildTextPage(page)
         { text = L["Outline"],       value = "OUTLINE" },
         { text = L["Thick Outline"], value = "THICKOUTLINE" },
     }, 260, y), L["Black outline drawn around text for readability."])
+
 end
 
 local function buildRaidMarkerPage(page)
@@ -1008,6 +1046,7 @@ local function buildProfilesPage(page)
     end)
     profileDropdownRefresh = function() dd:GenerateMenu() end
     profileDropdownRefresh()
+    addTooltip(dd, L["Switch the active profile for the current character. Each character can use a different profile."])
 
     y = y - 56
 
@@ -1016,6 +1055,7 @@ local function buildProfilesPage(page)
     btnNew:SetSize(110, 22)
     btnNew:SetPoint("TOPLEFT", 14, y)
     btnNew:SetText(L["New..."])
+    addTooltip(btnNew, L["Create a new profile by copying the current settings."])
     btnNew:SetScript("OnClick", function()
         showProfilePopup(L["Name of the new profile (copies current settings):"], "", function(name)
             name = (name or ""):gsub("^%s+", ""):gsub("%s+$", "")
@@ -1034,6 +1074,7 @@ local function buildProfilesPage(page)
     btnReset:SetSize(110, 22)
     btnReset:SetPoint("LEFT", btnNew, "RIGHT", 6, 0)
     btnReset:SetText(L["Reset"])
+    addTooltip(btnReset, L["Reset the active profile to default settings."])
     btnReset:SetScript("OnClick", function()
         local name = BW:GetActiveProfileName()
         showConfirmPopup(format(L["Reset profile '%s' to defaults?"], name), function()
@@ -1048,6 +1089,7 @@ local function buildProfilesPage(page)
     btnDelete:SetSize(110, 22)
     btnDelete:SetPoint("LEFT", btnReset, "RIGHT", 6, 0)
     btnDelete:SetText(L["Delete"])
+    addTooltip(btnDelete, L["Delete the active profile (cannot delete Default)."])
     btnDelete:SetScript("OnClick", function()
         local name = BW:GetActiveProfileName()
         if name == "Default" then
@@ -1080,6 +1122,7 @@ local function buildProfilesPage(page)
     exportEdit:SetFontObject("GameFontHighlightSmall")
     exportEdit:SetWidth(498)
     exportEdit:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+    addTooltip(exportEdit, L["Export string for the active profile. Click Select All then Ctrl+C to copy."])
 
     local function refreshExport()
         local s = BW:ExportProfile()
@@ -1092,6 +1135,7 @@ local function buildProfilesPage(page)
     btnRefreshExport:SetPoint("TOPLEFT", exportScroll, "BOTTOMLEFT", 0, -4)
     btnRefreshExport:SetText(L["Refresh export"])
     btnRefreshExport:SetScript("OnClick", refreshExport)
+    addTooltip(btnRefreshExport, L["Re-generate the export string from the current profile settings."])
 
     local btnSelectAll = CreateFrame("Button", nil, page, "UIPanelButtonTemplate")
     btnSelectAll:SetSize(130, 22)
@@ -1100,6 +1144,7 @@ local function buildProfilesPage(page)
     btnSelectAll:SetScript("OnClick", function()
         exportEdit:SetFocus(); exportEdit:HighlightText()
     end)
+    addTooltip(btnSelectAll, L["Highlight the export string so you can Ctrl+C copy it."])
 
     y = y - 116
 
@@ -1118,11 +1163,13 @@ local function buildProfilesPage(page)
     importEdit:SetFontObject("GameFontHighlightSmall")
     importEdit:SetWidth(498)
     importEdit:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+    addTooltip(importEdit, L["Paste a profile export string here, then click Import to create a new profile."])
 
     local btnImport = CreateFrame("Button", nil, page, "UIPanelButtonTemplate")
     btnImport:SetSize(200, 22)
     btnImport:SetPoint("TOPLEFT", importScroll, "BOTTOMLEFT", 0, -4)
     btnImport:SetText(L["Import as new profile..."])
+    addTooltip(btnImport, L["Paste a profile export string above and click here to import it as a new profile."])
     btnImport:SetScript("OnClick", function()
         local text = importEdit:GetText() or ""
         if text:gsub("%s", "") == "" then
@@ -1202,6 +1249,7 @@ local function buildAboutPage(page)
         eb:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
         eb:SetScript("OnEnterPressed",  function(self) self:ClearFocus() end)
         eb:SetScript("OnMouseDown", function(self) self:HighlightText(); self:SetFocus() end)
+        addTooltip(eb, L["Click to select, then Ctrl+C to copy."])
         return eb
     end
 
@@ -1210,9 +1258,10 @@ local function buildAboutPage(page)
     urlField(-220, "|cffffffff" .. L["Report an issue:"]     .. "|r", "https://github.com/Timikana/BossWatch/issues")
     urlField(-270, "|cffeda14a"  .. (L["CurseForge:"] or "CurseForge:") .. "|r", "https://www.curseforge.com/wow/addons/bosswatch")
     urlField(-320, "|cffb371ff"  .. (L["Wago:"]       or "Wago:")       .. "|r", "https://addons.wago.io/addons/bosswatch")
+    urlField(-370, "|cff5865f2"  .. (L["Discord (support / bugs / suggestions):"] or "Discord (support / bugs / suggestions):") .. "|r", "https://discord.gg/uFmxwexQ4P")
 
     local cmdHeader = page:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    cmdHeader:SetPoint("TOPLEFT", 14, -380)
+    cmdHeader:SetPoint("TOPLEFT", 14, -440)
     cmdHeader:SetText(L["Slash commands"])
 
     local cmds = page:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -1413,6 +1462,7 @@ function BW:RegisterBlizzardSettings()
         if SettingsPanel and SettingsPanel:IsShown() then HideUIPanel(SettingsPanel) end
         if not panel or not panel:IsShown() then BW:ToggleOptions() end
     end)
+    addTooltip(btn, L["Open the floating BossWatch options panel."])
 
     local hint = host:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
     hint:SetPoint("TOPLEFT", btn, "BOTTOMLEFT", 0, -10)

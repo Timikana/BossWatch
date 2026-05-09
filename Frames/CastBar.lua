@@ -119,8 +119,8 @@ local function StartCast(frame, channeling)
     cb._secret = secret
     cb._startTimeMs = startMs
     cb._endTimeMs = endMs
-    pcall(cb.SetMinMaxValues, cb, startMs, endMs)
-    pcall(cb.SetValue, cb, channeling and endMs or startMs)
+    cb:SetMinMaxValues(startMs, endMs)
+    cb:SetValue(channeling and endMs or startMs)
     if not secret then
         cb._startTime = startMs / 1000
         cb._endTime   = endMs / 1000
@@ -133,10 +133,9 @@ local function StartCast(frame, channeling)
     cb.spellText:SetText(text or name or "")
     if texture then cb.icon:SetTexture(texture); cb.icon:Show() else cb.icon:Hide() end
 
-    local isProtected
-    do
-        local ok, v = pcall(function() return notInterruptible == true end)
-        if ok then isProtected = v end
+    local isProtected = nil
+    if notInterruptible ~= nil and not issecretvalue(notInterruptible) then
+        isProtected = notInterruptible == true
     end
     if isProtected then cb:SetStatusBarColor(0.7, 0.7, 0.7)
     elseif channeling then cb:SetStatusBarColor(0.3, 0.9, 0.3)
@@ -171,13 +170,9 @@ tickerFrame:SetScript("OnUpdate", function()
             elseif cb._casting or cb._channeling then
                 cb:SetAlpha(1)
                 if cb._secret then
-                    pcall(cb.SetValue, cb, now * 1000)
-                    local ok, remaining = pcall(function()
-                        return (cb._endTimeMs - now * 1000) / 1000
-                    end)
-                    if ok and remaining and remaining > 0 then
-                        cb.timeText:SetFormattedText("%.1f", remaining)
-                    else cb.timeText:SetText("") end
+                    cb:SetValue(now * 1000)
+                    -- endTimeMs is secret → can't compute remaining; clear text
+                    cb.timeText:SetText("")
                 elseif cb._endTime and now >= cb._endTime then
                     ClearCast(f)
                 elseif cb._endTime then
