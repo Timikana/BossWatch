@@ -711,9 +711,7 @@ local function buildBarsPage(page)
     makeSection(page, L["Health"], 14, y); y = y - 24
     addTooltip(makeMediaDropdown(page, L["Health Texture"], "healthTexture", "statusbar", 14, y, 180, {0.9, 0.2, 0.2}),
         L["Status bar texture used for the boss health bar."])
-    addTooltip(makeSlider(page, L["HP background alpha"], "healthBackgroundAlpha", 0, 1, 0.05, 260, y),
-        L["Opacity of the empty (un-filled) part of the health bar."])
-    y = y - 56
+    y = y - 50
     addTooltip(makeDropdown(page, L["Color mode"], "healthColorMode", {
         { text = L["Reaction (Blizzard)"], value = "REACTION" },
         { text = L["Class fallback"],      value = "CLASS_FALLBACK" },
@@ -721,17 +719,21 @@ local function buildBarsPage(page)
     }, 14, y, 180), L["How the health bar is colored: by reaction (red/yellow/green), by class, or one fixed color."])
     addTooltip(makeColorPicker(page, L["Static color"], "healthStaticColor", 280, y),
         L["Fixed color used when the mode above is set to 'Custom static'."])
+    y = y - 56
+    addTooltip(makeSlider(page, L["HP background alpha"], "healthBackgroundAlpha", 0, 1, 0.05, 14, y),
+        L["Opacity of the empty (un-filled) part of the health bar."])
 
     -- ============ POWER ============
     y = y - 60
     makeSection(page, L["Power"], 14, y); y = y - 24
     addTooltip(makeCheck(page, L["Show Power Bar"], "showPowerBar", 14, y),
         L["Display the power bar below the health bar."])
-    addTooltip(markAsNew(makeSlider(page, L["Power bar height"], "powerBarHeight", 2, 20, 1, 184, y), "powerBarHeight_dim"),
-        L["Height of the power bar in pixels (resource: mana, rage, energy, etc.)."])
-    y = y - 56
+    y = y - 30
     addTooltip(makeMediaDropdown(page, L["Power Texture"], "powerTexture", "statusbar", 14, y, 180, {0.3, 0.45, 1}),
         L["Status bar texture used for the boss power (mana / rage / etc.) bar."])
+    y = y - 50
+    addTooltip(markAsNew(makeSlider(page, L["Power bar height"], "powerBarHeight", 2, 20, 1, 14, y), "powerBarHeight_dim"),
+        L["Height of the power bar in pixels (resource: mana, rage, energy, etc.)."])
     addTooltip(makeSlider(page, L["Power background alpha"], "powerBackgroundAlpha", 0, 1, 0.05, 260, y),
         L["Opacity of the empty part of the power bar."])
 
@@ -751,7 +753,8 @@ local function buildBarsPage(page)
     makeSection(page, L["Background"], 14, y); y = y - 24
     addTooltip(markAsNew(makeMediaDropdown(page, L["Background Texture"], "barBackgroundTexture", "statusbar", 14, y, 180), "barBackgroundTexture"),
         L["Texture used behind the bars (the empty / dark portion)."])
-    addTooltip(markAsNew(makeSlider(page, L["Frame background alpha"], "frameBackgroundAlpha", 0, 1, 0.05, 260, y), "frameBackgroundAlpha"),
+    y = y - 50
+    addTooltip(markAsNew(makeSlider(page, L["Frame background alpha"], "frameBackgroundAlpha", 0, 1, 0.05, 14, y), "frameBackgroundAlpha"),
         L["Opacity of the dark frame backdrop behind everything."])
     y = y - 56
     addTooltip(markAsNew(makeCheck(page, L["Frame bg wraps cast zone"], "frameBgWrapsCast", 14, y), "frameBgWrapsCast"),
@@ -768,15 +771,14 @@ local function buildCastPage(page)
         L["Show a cast bar under the boss frame when it's casting."])
     addTooltip(makeCheck(page, L["Detached"], "castBarDetached", 184, y),
         L["Detach the cast bar from the boss frame so you can place it anywhere on screen."])
-    y = y - 36
+    y = y - 30
     addTooltip(makeMediaDropdown(page, L["Cast Bar Texture"], "castTexture", "statusbar", 14, y, 180, {1, 0.82, 0}),
         L["Status bar texture used for the cast bar fill."])
-    addTooltip(markAsNew(makeSlider(page, L["Cast bar height"], "castBarHeight", 8, 40, 1, 260, y), "castBarHeight_dim"),
+    y = y - 50
+    addTooltip(markAsNew(makeSlider(page, L["Cast bar height"], "castBarHeight", 8, 40, 1, 14, y), "castBarHeight_dim"),
         L["Height of the cast bar in pixels."])
-    y = y - 60
-    addTooltip(makeSlider(page, L["Cast bg alpha"], "castBackgroundAlpha", 0, 1, 0.05, 14, y),
+    addTooltip(makeSlider(page, L["Cast bg alpha"], "castBackgroundAlpha", 0, 1, 0.05, 260, y),
         L["Opacity of the cast bar's empty/background portion."])
-    y = y - 8
 
     -- ============ SPELL ICON ============
     y = y - 60
