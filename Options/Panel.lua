@@ -30,6 +30,36 @@ local function _refreshHeightsForPage(parent)
     end
 end
 
+-- Apply a search query across every page. Empty query restores DB-saved
+-- collapsed state. Non-empty: collapses sections without any match, expands
+-- those with a hit on either the section title or any registered child label.
+local function _applySearch(rawQuery)
+    local q = (rawQuery or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
+    local empty = (q == "")
+    BossWatchDB = BossWatchDB or {}
+    local saved = BossWatchDB.collapsedSections or {}
+
+    for _, sections in pairs(_allSectionsOnPage) do
+        for _, section in ipairs(sections) do
+            if empty then
+                section:SetCollapsed(saved[section.key] and true or false, false)
+            else
+                local match = section._searchText and section._searchText:find(q, 1, true) ~= nil
+                if not match then
+                    for _, w in ipairs(section.children) do
+                        local txt = w._searchText
+                        if txt and txt:lower():find(q, 1, true) then
+                            match = true
+                            break
+                        end
+                    end
+                end
+                section:SetCollapsed(not match, false)
+            end
+        end
+    end
+end
+
 local function _captureAndReparent(widget, container, sectionOriginY)
     -- Reparent the widget to the section container so it inherits visibility
     -- (we still call Hide() on collapse for click-through reasons).
@@ -175,6 +205,7 @@ local function makeSlider(parent, label, key, minV, maxV, step, x, y, width)
     end, sl)
 
     sl.refresh = function() sl:Init(readDB(), minV, maxV, numSteps, formatters) end
+    sl._searchText = label or ""
     _registerInSection(sl, key)
     return sl
 end
@@ -190,6 +221,7 @@ local function makeCheck(parent, label, key, x, y)
         BW:GetDB()[key] = self:GetChecked() and true or false
         refresh()
     end)
+    cb._searchText = label or ""
     _registerInSection(cb, key)
     return cb
 end
@@ -218,6 +250,7 @@ local function makeDropdown(parent, label, key, options, x, y, width)
     end)
     dd.refresh = function() dd:GenerateMenu() end
     dd._labelFS = labelFS
+    dd._searchText = label or ""
     _registerInSection(dd, key)
     _registerInSection(labelFS)
     return dd
@@ -426,6 +459,7 @@ local function makeMediaDropdown(parent, label, key, mediaType, x, y, width, tin
     btn.refresh()
     -- Register all the sibling regions of the media dropdown so that collapsing
     -- the section hides the label and the preview as well, not just the button.
+    btn._searchText = label or ""
     _registerInSection(btn, key)
     _registerInSection(labelFS)
     _registerInSection(previewBg)
@@ -535,6 +569,7 @@ local function makeColorPicker(parent, label, dbKey, x, y)
     end)
 
     btn.dbKey = dbKey
+    btn._searchText = label or ""
     _registerInSection(btn, dbKey)
     if lab then _registerInSection(lab) end
     return btn
@@ -583,6 +618,7 @@ local function makeSection(parent, title, x, y, key)
     end
     container:SetHeight(COLLAPSED_HEIGHT)
     section.container = container
+    section._searchText = (title or ""):lower()
     _lastSectionOnPage[parent] = section
     _allSectionsOnPage[parent] = _allSectionsOnPage[parent] or {}
     _allSectionsOnPage[parent][#_allSectionsOnPage[parent] + 1] = section
@@ -715,6 +751,8 @@ end
 -- (slider thumb, steppers) so the tooltip shows everywhere on composite widgets.
 addTooltip = function(widget, text)
     if not widget or not text or text == "" then return widget end
+    -- Index for the search bar (label + tooltip body, lower-cased once at build time)
+    widget._searchText = ((widget._searchText or "") .. " " .. text):lower()
     local function show(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         GameTooltip:AddLine(text, 1, 1, 1, true)
@@ -1599,6 +1637,43 @@ local function build()
     elseif panel.SetPortraitToAsset then
         panel:SetPortraitToAsset("Interface\\AddOns\\BossWatch\\Media\\logo.png")
     end
+
+    -- Search bar (top-right of the title area)
+    local searchBox = CreateFrame("EditBox", "BWOpt_Search", panel, "InputBoxTemplate")
+    searchBox:SetSize(200, 22)
+    searchBox:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -38, -32)
+    searchBox:SetAutoFocus(false)
+    searchBox:SetMaxLetters(40)
+    searchBox:SetFontObject("GameFontHighlight")
+    searchBox:SetTextInsets(20, 18, 0, 0)
+
+    local searchIcon = searchBox:CreateTexture(nil, "OVERLAY")
+    searchIcon:SetTexture("Interface\\Common\\UI-Searchbox-Icon")
+    searchIcon:SetSize(14, 14)
+    searchIcon:SetPoint("LEFT", searchBox, "LEFT", 4, 0)
+
+    local searchPlaceholder = searchBox:CreateFontString(nil, "OVERLAY", "GameFontDisable")
+    searchPlaceholder:SetPoint("LEFT", searchIcon, "RIGHT", 4, 0)
+    searchPlaceholder:SetText(L["Search options…"])
+
+    local searchClear = CreateFrame("Button", nil, searchBox)
+    searchClear:SetSize(16, 16)
+    searchClear:SetPoint("RIGHT", searchBox, "RIGHT", -2, 0)
+    searchClear:SetNormalTexture("Interface\\Buttons\\UI-StopButton")
+    searchClear:Hide()
+
+    local function runSearch(text)
+        searchPlaceholder:SetShown(text == "")
+        searchClear:SetShown(text ~= "")
+        _applySearch(text)
+    end
+
+    searchBox:SetScript("OnTextChanged", function(self) runSearch(self:GetText()) end)
+    searchBox:SetScript("OnEscapePressed", function(self) self:SetText(""); self:ClearFocus() end)
+    searchBox:SetScript("OnEnterPressed",  function(self) self:ClearFocus() end)
+    searchClear:SetScript("OnClick", function() searchBox:SetText(""); searchBox:ClearFocus() end)
+    addTooltip(searchBox, L["Filter the panel: type any keyword from a label or tooltip. Sections without a match are auto-collapsed."])
+    addTooltip(searchClear, L["Clear the search."])
 
     local pageHolder = CreateFrame("Frame", nil, panel)
     pageHolder:SetPoint("TOPLEFT", 8, -60)

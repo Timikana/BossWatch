@@ -381,6 +381,9 @@ L["Click to collapse/expand this section."]                                     
 L["Reset this section to default values."]                                           = "Réinitialiser cette section aux valeurs par défaut."
 L["Reset window size"]                                                               = "Réinitialiser la fenêtre"
 L["Reset the options window to its default size and position."]                      = "Remet la fenêtre d'options à sa taille et sa position par défaut."
+L["Search options…"]                                                                 = "Rechercher…"
+L["Filter the panel: type any keyword from a label or tooltip. Sections without a match are auto-collapsed."] = "Filtrer le panneau : tape un mot-clé d'un libellé ou d'une astuce. Les sections sans correspondance se replient automatiquement."
+L["Clear the search."]                                                               = "Effacer la recherche."
 
 -- ============================================================
 -- SECTION HEADERS (UI reorg)
