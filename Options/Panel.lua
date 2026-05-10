@@ -243,16 +243,19 @@ local function makeCheck(parent, label, key, x, y)
 end
 
 local function makeDropdown(parent, label, key, options, x, y, width)
-    local labelFS = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    labelFS:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y)
-    labelFS:SetText(label)
-
-    -- Modern 11.0 dropdown (same template used by native Settings panels)
+    -- Modern 11.0 dropdown (same template used by native Settings panels).
+    -- The dropdown body is the anchor parent (so col2 auto-flow works) and
+    -- the label sits ABOVE it — visual position identical to the old layout
+    -- where the label was the parent.
     local dd = CreateFrame("DropdownButton", "BWOpt_DD_"..key, parent, "WowStyle1DropdownTemplate")
-    dd:SetPoint("TOPLEFT", labelFS, "BOTTOMLEFT", 0, -2)
     dd:SetWidth(width or 160)
+    dd:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y - 16)
     dd.dbKey = key
     dd._options = options
+
+    local labelFS = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    labelFS:SetPoint("BOTTOMLEFT", dd, "TOPLEFT", 0, 2)
+    labelFS:SetText(label)
 
     dd:SetupMenu(function(_, rootDescription)
         for _, opt in ipairs(options) do
@@ -267,7 +270,7 @@ local function makeDropdown(parent, label, key, options, x, y, width)
     dd.refresh = function() dd:GenerateMenu() end
     dd._labelFS = labelFS
     dd._searchText = label or ""
-    dd._searchGroup = { labelFS, dd }
+    dd._searchGroup = { dd, labelFS }  -- dd is the leader (auto-flow target)
     _registerInSection(dd, key)
     _registerInSection(labelFS)
     return dd
@@ -282,14 +285,15 @@ local function makeMediaDropdown(parent, label, key, mediaType, x, y, width, tin
     local TR, TG, TB = 1, 1, 1
     if tint then TR, TG, TB = tint[1] or 1, tint[2] or 1, tint[3] or 1 end
 
-    local labelFS = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    labelFS:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y)
-    labelFS:SetText(label)
-
-    -- Anchor button (acts as the dropdown header) — modern dark style
+    -- Anchor button (acts as the dropdown header) — modern dark style.
+    -- btn is the anchor parent so col2 auto-flow works; labelFS sits above it.
     local btn = CreateFrame("Button", nil, parent, "BackdropTemplate")
     btn:SetSize(width, 24)
-    btn:SetPoint("TOPLEFT", labelFS, "BOTTOMLEFT", 0, -4)
+    btn:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y - 18)
+
+    local labelFS = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    labelFS:SetPoint("BOTTOMLEFT", btn, "TOPLEFT", 0, 4)
+    labelFS:SetText(label)
     btn:SetBackdrop({
         bgFile   = "Interface\\Buttons\\WHITE8x8",
         edgeFile = "Interface\\Buttons\\WHITE8x8",
@@ -477,7 +481,7 @@ local function makeMediaDropdown(parent, label, key, mediaType, x, y, width, tin
     -- Register all the sibling regions of the media dropdown so that collapsing
     -- the section hides the label and the preview as well, not just the button.
     btn._searchText = label or ""
-    btn._searchGroup = { labelFS, btn, previewBg, previewBorder, (previewTex or previewText) }
+    btn._searchGroup = { btn, labelFS, previewBg, previewBorder, (previewTex or previewText) }
     _registerInSection(btn, key)
     _registerInSection(labelFS)
     _registerInSection(previewBg)
@@ -489,21 +493,20 @@ end
 
 local function makeColorPicker(parent, label, dbKey, x, y)
     local lab
-    if label and label ~= "" then
-        lab = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        lab:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y)
-        lab:SetText(label)
-    end
-
-    -- Modern compact swatch button: gold thin border + inner color swatch
+    -- Modern compact swatch button: gold thin border + inner color swatch.
+    -- btn is the anchor parent; the optional label sits above it. This way
+    -- col2 colorpickers participate in auto-flow.
     local btn = CreateFrame("Button", nil, parent)
     btn:SetSize(28, 22)
-    if lab then
-        btn:SetPoint("TOPLEFT", lab, "BOTTOMLEFT", 0, -2)
-    else
-        btn:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y)
-    end
+    local hasLabel = label and label ~= ""
+    btn:SetPoint("TOPLEFT", parent, "TOPLEFT", x, hasLabel and (y - 16) or y)
     btn:RegisterForClicks("AnyUp")
+
+    if hasLabel then
+        lab = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        lab:SetPoint("BOTTOMLEFT", btn, "TOPLEFT", 0, 2)
+        lab:SetText(label)
+    end
 
     local border = btn:CreateTexture(nil, "BACKGROUND")
     border:SetAllPoints(btn)
@@ -588,7 +591,7 @@ local function makeColorPicker(parent, label, dbKey, x, y)
 
     btn.dbKey = dbKey
     btn._searchText = label or ""
-    btn._searchGroup = lab and { lab, btn } or { btn }
+    btn._searchGroup = lab and { btn, lab } or { btn }
     _registerInSection(btn, dbKey)
     if lab then _registerInSection(lab) end
     return btn
