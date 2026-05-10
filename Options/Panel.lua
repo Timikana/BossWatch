@@ -2077,7 +2077,7 @@ local function build()
     -- and stays selected; sister addons (TankWatch) appear below it ONLY if
     -- the addon is loaded. Click a sister tab → close this panel + open theirs.
     -- =====================================================================
-    local SIDE_TAB_SIZE = 36
+    local SIDE_TAB_SIZE = 44
     local sideTabs = {
         { id = "BossWatch",  isSelf = true,  icon = "Interface\\AddOns\\BossWatch\\Media\\logo.png",
           tooltip = L["BossWatch — Options"], onClick = function() end },
@@ -2099,36 +2099,66 @@ local function build()
         if def.isSelf or (def.loadedCheck and def.loadedCheck()) then
             visibleIdx = visibleIdx + 1
 
-            local tab = CreateFrame("Button", nil, panel)
+            local tab = CreateFrame("Button", nil, panel, "BackdropTemplate")
             tab:SetSize(SIDE_TAB_SIZE, SIDE_TAB_SIZE)
-            tab:SetPoint("TOPLEFT", panel, "TOPLEFT", -SIDE_TAB_SIZE + 4,
-                         -60 - (visibleIdx - 1) * (SIDE_TAB_SIZE + 4))
+            tab:SetPoint("TOPLEFT", panel, "TOPLEFT", -SIDE_TAB_SIZE + 6,
+                         -64 - (visibleIdx - 1) * (SIDE_TAB_SIZE + 6))
+            tab:SetFrameLevel(panel:GetFrameLevel() + 5)
 
-            local bg = tab:CreateTexture(nil, "BACKGROUND")
-            bg:SetAllPoints(tab)
-            bg:SetColorTexture(0.05, 0.05, 0.06, 0.9)
+            -- Modern dark backdrop with thin border (like 11.0 Settings panels)
+            tab:SetBackdrop({
+                bgFile   = "Interface\\Buttons\\WHITE8x8",
+                edgeFile = "Interface\\Buttons\\WHITE8x8",
+                edgeSize = 1,
+            })
+            tab:SetBackdropColor(0.04, 0.04, 0.06, 0.95)
+            tab:SetBackdropBorderColor(0.30, 0.30, 0.36, 1)
 
-            local border = CreateFrame("Frame", nil, tab, "BackdropTemplate")
-            border:SetAllPoints(tab)
-            border:SetBackdrop({ edgeFile = "Interface\\Buttons\\WHITE8x8", edgeSize = 1 })
-            border:SetBackdropBorderColor(0.35, 0.35, 0.40, 1)
+            -- Top-edge highlight (subtle "shine" line at the top of the tab)
+            local sheen = tab:CreateTexture(nil, "ARTWORK")
+            sheen:SetPoint("TOPLEFT",  tab, "TOPLEFT",   1,  -1)
+            sheen:SetPoint("TOPRIGHT", tab, "TOPRIGHT", -1,  -1)
+            sheen:SetHeight(2)
+            sheen:SetColorTexture(1, 1, 1, 0.10)
 
-            local icon = tab:CreateTexture(nil, "ARTWORK")
-            icon:SetPoint("TOPLEFT",     tab, "TOPLEFT",     3, -3)
-            icon:SetPoint("BOTTOMRIGHT", tab, "BOTTOMRIGHT", -3, 3)
+            -- Icon (slightly inset)
+            local icon = tab:CreateTexture(nil, "ARTWORK", nil, 1)
+            icon:SetPoint("TOPLEFT",     tab, "TOPLEFT",      4, -4)
+            icon:SetPoint("BOTTOMRIGHT", tab, "BOTTOMRIGHT", -4,  4)
             icon:SetTexture(def.icon)
-            icon:SetTexCoord(0, 1, 0, 1)
+            icon:SetTexCoord(0.04, 0.96, 0.04, 0.96)
+
+            -- Outer glow for selected / hover (additive yellow)
+            local glow = tab:CreateTexture(nil, "OVERLAY")
+            glow:SetPoint("TOPLEFT",     tab, "TOPLEFT",     -6,  6)
+            glow:SetPoint("BOTTOMRIGHT", tab, "BOTTOMRIGHT",  6, -6)
+            glow:SetTexture("Interface\\Buttons\\UI-ActionButton-Border")
+            glow:SetBlendMode("ADD")
+            glow:SetVertexColor(1, 0.82, 0, 0.95)
+            glow:Hide()
+
+            -- Selected mark: a thin gold bar along the LEFT edge (the side
+            -- closer to the panel body) — same idiom as the modern Settings list.
+            local marker = tab:CreateTexture(nil, "OVERLAY")
+            marker:SetPoint("TOPRIGHT",    tab, "TOPRIGHT",    -1, -2)
+            marker:SetPoint("BOTTOMRIGHT", tab, "BOTTOMRIGHT", -1,  2)
+            marker:SetWidth(2)
+            marker:SetColorTexture(1, 0.82, 0, 1)
+            marker:Hide()
 
             if def.isSelf then
-                -- "Selected" look on the active addon's tab
-                border:SetBackdropBorderColor(1, 0.82, 0, 1)
+                tab:SetBackdropBorderColor(1, 0.82, 0, 1)
+                glow:Show()
+                marker:Show()
                 tab:EnableMouse(false)
             else
-                tab:HookScript("OnEnter", function()
-                    border:SetBackdropBorderColor(1, 0.82, 0, 1)
+                tab:HookScript("OnEnter", function(self)
+                    self:SetBackdropBorderColor(1, 0.82, 0, 1)
+                    glow:Show()
                 end)
-                tab:HookScript("OnLeave", function()
-                    border:SetBackdropBorderColor(0.35, 0.35, 0.40, 1)
+                tab:HookScript("OnLeave", function(self)
+                    self:SetBackdropBorderColor(0.30, 0.30, 0.36, 1)
+                    glow:Hide()
                 end)
                 tab:SetScript("OnClick", def.onClick)
             end
