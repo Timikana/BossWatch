@@ -605,11 +605,13 @@ local function makeSection(parent, title, x, y, key)
     clickArea:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     section.clickArea = clickArea
 
-    -- Reset section button (small "R")
-    local btnReset = CreateFrame("Button", nil, container, "UIPanelButtonTemplate")
-    btnReset:SetSize(20, 18)
-    btnReset:SetPoint("TOPRIGHT", container, "TOPRIGHT", -16, -2)
-    btnReset:SetText("R")
+    -- Reset section button (refresh icon, same pattern as TankWatch)
+    local btnReset = CreateFrame("Button", nil, container)
+    btnReset:SetSize(14, 14)
+    btnReset:SetPoint("TOPRIGHT", container, "TOPRIGHT", -14, -1)
+    btnReset:SetNormalTexture("Interface\\Buttons\\UI-RefreshButton")
+    btnReset:GetNormalTexture():SetTexCoord(0.05, 0.95, 0.05, 0.95)
+    btnReset:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight", "ADD")
     section.resetBtn = btnReset
 
     local line = container:CreateTexture(nil, "OVERLAY")
