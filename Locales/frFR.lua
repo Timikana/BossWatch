@@ -1,8 +1,8 @@
-local addonName, BW = ...
+local addonName, BossW = ...
 
 if GetLocale() ~= "frFR" then return end
 
-local L = BW.L
+local L = BossW.L
 
 -- ============================================================
 -- TABS
@@ -193,7 +193,7 @@ L["Above icon"]         = "Au-dessus de l'icône"
 L["Custom boss target frames — v%s\nClick the button below to open the BossWatch configuration panel."] =
     "Cadres de boss personnalisés — v%s\nCliquez sur le bouton ci-dessous pour ouvrir le panneau de configuration de BossWatch."
 L["Open BossWatch options"]                = "Ouvrir les options de BossWatch"
-L["You can also use the slash command: /bw"] = "Vous pouvez aussi utiliser la commande : /bw"
+L["You can also use the slash command: /bossw"] = "Vous pouvez aussi utiliser la commande : /bossw"
 
 -- ============================================================
 -- SLASH / CHAT
@@ -203,8 +203,8 @@ L["open options"]               = "ouvrir les options"
 L["toggle mover"]               = "afficher / cacher le mover"
 L["simulate N bosses (0-5)"]    = "simuler N boss (0 à 5)"
 L["reset all settings + reload"] = "réinitialiser et recharger l'UI"
-L["|cffeda55fBossWatch|r v%s loaded — type |cffffff00/bw|r for options"] =
-    "|cffeda55fBossWatch|r v%s chargé — tapez |cffffff00/bw|r pour les options"
+L["|cffeda55fBossWatch|r v%s loaded — type |cffffff00/bossw|r for options"] =
+    "|cffeda55fBossWatch|r v%s chargé — tapez |cffffff00/bossw|r pour les options"
 
 -- ============================================================
 -- ABOUT PAGE
@@ -387,6 +387,7 @@ L["Close BossWatch and open the TankWatch options panel."]                      
 L["Search options…"]                                                                 = "Rechercher…"
 L["Filter the panel: type any keyword from a label or tooltip. Sections without a match are auto-collapsed."] = "Filtrer le panneau : tape un mot-clé d'un libellé ou d'une astuce. Les sections sans correspondance se replient automatiquement."
 L["Clear the search."]                                                               = "Effacer la recherche."
+L["⚠ Classic build — UI not fully tested in encounters yet, please report bugs."]    = "⚠ Version Classic — interface pas encore testée à 100 % en donjon/raid, merci de remonter les bugs."
 L["No options match your search."]                                                   = "Aucune option ne correspond à ta recherche."
 L["Smooth bar animation"]                                                            = "Animation fluide des barres"
 L["Animate the health bar between values instead of jumping. Disable for instant updates."] = "Anime la barre de vie entre les valeurs au lieu de sauter. Désactive pour des mises à jour instantanées."
@@ -396,6 +397,12 @@ L["Enable modifier+click shortcuts on boss frames: Shift+Click cycles a raid mar
 -- Changelog tab
 L["Release notes and recent changes."] = "Notes de version et changements récents."
 L["Compatibility with WoW patch 12.0.7 (no more out-of-date warning)."] = "Compatibilité avec le patch WoW 12.0.7 (plus d'avertissement \"obsolète\")."
+L["Mists of Pandaria Classic support: a single zip now installs on retail and MoP Classic."] = "Support Mists of Pandaria Classic : un seul zip s'installe maintenant sur retail et MoP Classic."
+L["New slash command: /bossw (with alias /bosswatch). The old /bw is gone — that prefix collides with BigWigs."] = "Nouvelle commande : /bossw (avec alias /bosswatch). L'ancien /bw a disparu — ce préfixe entrait en collision avec BigWigs."
+L["Bottom tabs now wrap onto a second row when the panel is too narrow, with proper layering so nothing gets clipped."] = "Les onglets du bas passent maintenant sur une seconde ligne quand le panneau est trop étroit, avec un bon ordre d'affichage pour éviter les clips."
+L["Switching between BossWatch and TankWatch via the side tabs now keeps the window in place — no more jumping to the other addon's saved position."] = "Le switch BossWatch ↔ TankWatch via les onglets latéraux conserve maintenant la fenêtre en place — fini les sauts vers la position sauvegardée de l'autre addon."
+L["Boss debuffs are detected more reliably on Classic clients (uses the native isBossDebuff flag instead of name-matching)."] = "Les debuffs de boss sont détectés plus fiablement côté Classic (on lit le flag natif isBossDebuff au lieu de matcher sur le nom)."
+L["A yellow banner appears at the top of the panel on Classic builds, flagging that the UI is not yet fully tested in encounters."] = "Une bannière jaune apparaît en haut du panneau sur les versions Classic, pour signaler que l'interface n'est pas encore totalement testée en combat."
 L["Addon side tabs on the left edge of the panel: switch between BossWatch and TankWatch with one click (the second tab only appears when the sister addon is installed)."] = "Onglets d'addons à gauche du panneau : bascule entre BossWatch et TankWatch en un clic (le second onglet n'apparaît que si l'addon frère est installé)."
 L["Modern look on the side tabs: dark glass backdrop, gold accent stripe on the active addon, glow ring on hover."] = "Style moderne sur les onglets latéraux : fond verre sombre, liseré doré sur l'addon actif, halo doré au survol."
 L["Search bar (top-right) gathers matches from every tab onto a single Results page — Blizzard-style. Tabs show a (N) badge per hit count."] = "Barre de recherche (en haut à droite) qui rassemble les correspondances de tous les onglets sur une page Résultats — style Blizzard. Les onglets affichent un badge (N) selon le nombre de correspondances."

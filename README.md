@@ -43,14 +43,14 @@ Search for **BossWatch** in your addon manager and click install.
 
 | Command | Description |
 |---|---|
-| `/bw` | Open the options panel |
-| `/bw mover` | Toggle the drag handle to reposition the boss container |
-| `/bw test N` | Simulate N bosses (0 to 5) with HP drain, casts and auras |
-| `/bw reset` | Wipe all settings and reload the UI |
+| `/bossw` | Open the options panel |
+| `/bossw mover` | Toggle the drag handle to reposition the boss container |
+| `/bossw test N` | Simulate N bosses (0 to 5) with HP drain, casts and auras |
+| `/bossw reset` | Wipe all settings and reload the UI |
 
 ## Configuration
 
-Open the options with `/bw`. Tabs:
+Open the options with `/bossw`. Tabs:
 
 - **Layout** — anchor, size, spacing, scale, portrait position
 - **Bars** — health/power textures, color mode, background alphas

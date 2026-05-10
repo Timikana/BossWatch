@@ -1,16 +1,16 @@
-local addonName, BW = ...
+local addonName, BossW = ...
 
 -- Expose the addon table globally for /dump and external access.
-_G[addonName] = BW
+_G[addonName] = BossW
 
-BW.MAX_BOSS = 5
-BW.BossFrames = {}
-BW.BossContainer = nil
+BossW.MAX_BOSS = 5
+BossW.BossFrames = {}
+BossW.BossContainer = nil
 
 -- ============================================================
 -- DEFAULTS
 -- ============================================================
-BW.Defaults = {
+BossW.Defaults = {
     enabled = true,
     hideBlizzard = true,
 
@@ -103,7 +103,7 @@ BW.Defaults = {
 -- ============================================================
 
 local function seedDefaults(target)
-    for k, v in pairs(BW.Defaults) do
+    for k, v in pairs(BossW.Defaults) do
         if target[k] == nil then
             if type(v) == "table" then
                 local c = {}
@@ -120,7 +120,7 @@ end
 -- PROFILES
 -- ============================================================
 
-function BW:GetCharKey()
+function BossW:GetCharKey()
     local name = UnitName("player") or "?"
     local realm = GetRealmName() or "?"
     return name .. " - " .. realm
@@ -161,30 +161,30 @@ local function ensureProfilesDB()
     BossWatchDB.seenFeatures = BossWatchDB.seenFeatures or {}
 end
 
-function BW:GetActiveProfileName()
+function BossW:GetActiveProfileName()
     ensureProfilesDB()
-    local key = BW:GetCharKey()
+    local key = BossW:GetCharKey()
     local n = BossWatchDB.charBindings[key]
     if n and BossWatchDB.profiles[n] then return n end
     BossWatchDB.charBindings[key] = "Default"
     return "Default"
 end
 
-function BW:GetDB()
+function BossW:GetDB()
     ensureProfilesDB()
-    local name = BW:GetActiveProfileName()
+    local name = BossW:GetActiveProfileName()
     local p = BossWatchDB.profiles[name]
     migrateLegacyTextures(p)
     seedDefaults(p)
     return p
 end
 
-function BW:SetActiveProfile(name)
+function BossW:SetActiveProfile(name)
     ensureProfilesDB()
     if not BossWatchDB.profiles[name] then return false end
-    BossWatchDB.charBindings[BW:GetCharKey()] = name
-    if BW.RefreshAll then BW:RefreshAll() end
-    if BW.ApplyFonts then BW:ApplyFonts() end
+    BossWatchDB.charBindings[BossW:GetCharKey()] = name
+    if BossW.RefreshAll then BossW:RefreshAll() end
+    if BossW.ApplyFonts then BossW:ApplyFonts() end
     return true
 end
 
@@ -195,22 +195,22 @@ local function deepCopy(t)
     return c
 end
 
-function BW:CreateProfile(newName, copyFromName)
+function BossW:CreateProfile(newName, copyFromName)
     ensureProfilesDB()
     if not newName or newName == "" or BossWatchDB.profiles[newName] then return false end
-    local source = BossWatchDB.profiles[copyFromName or BW:GetActiveProfileName()]
+    local source = BossWatchDB.profiles[copyFromName or BossW:GetActiveProfileName()]
     BossWatchDB.profiles[newName] = source and deepCopy(source) or {}
     return true
 end
 
-function BW:ResetProfile(name)
+function BossW:ResetProfile(name)
     ensureProfilesDB()
     if not BossWatchDB.profiles[name] then return false end
     BossWatchDB.profiles[name] = {}
     return true
 end
 
-function BW:DeleteProfile(name)
+function BossW:DeleteProfile(name)
     ensureProfilesDB()
     if name == "Default" then return false, "cannot delete Default" end
     if not BossWatchDB.profiles[name] then return false end
@@ -221,7 +221,7 @@ function BW:DeleteProfile(name)
     return true
 end
 
-function BW:ListProfiles()
+function BossW:ListProfiles()
     ensureProfilesDB()
     local list = {}
     for n in pairs(BossWatchDB.profiles) do list[#list + 1] = n end
@@ -293,15 +293,15 @@ local function serialize(t, indent)
     return table.concat(parts)
 end
 
-function BW:ExportProfile(name)
+function BossW:ExportProfile(name)
     ensureProfilesDB()
-    local p = BossWatchDB.profiles[name or BW:GetActiveProfileName()]
+    local p = BossWatchDB.profiles[name or BossW:GetActiveProfileName()]
     if not p then return nil end
     local body = "return " .. serialize(p)
     return "BW1:" .. b64encode(body)
 end
 
-function BW:ImportProfile(text, newName, overwrite)
+function BossW:ImportProfile(text, newName, overwrite)
     if not text or text == "" then return false, "import box is empty" end
     text = text:gsub("^%s+", ""):gsub("%s+$", "")
     if text:sub(1, 4) ~= "BW1:" then return false, "invalid format" end
@@ -334,7 +334,7 @@ do
     end
 end
 
-function BW:ResolveTexture(name)
+function BossW:ResolveTexture(name)
     if not name or name == "" then
         return "Interface\\TargetingFrame\\UI-StatusBar"
     end
@@ -347,7 +347,7 @@ function BW:ResolveTexture(name)
     return "Interface\\TargetingFrame\\UI-StatusBar"
 end
 
-function BW:ResolveFont(name)
+function BossW:ResolveFont(name)
     local fallback = STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF"
     if not name or name == "" then return fallback end
     if name:find("\\") or name:find("/") then return name end
@@ -359,10 +359,10 @@ function BW:ResolveFont(name)
     return fallback
 end
 
-function BW:ApplyFonts()
-    if not BW.BossFrames then return end
-    local db = BW:GetDB()
-    local file = BW:ResolveFont(db.fontFace)
+function BossW:ApplyFonts()
+    if not BossW.BossFrames then return end
+    local db = BossW:GetDB()
+    local file = BossW:ResolveFont(db.fontFace)
     local size = db.fontSize or 12
     local outline = db.fontOutline or "NONE"
     if outline == "NONE" then outline = "" end
@@ -371,8 +371,8 @@ function BW:ApplyFonts()
         if fs then pcall(fs.SetFont, fs, file, sz, ol) end
     end
 
-    for i = 1, BW.MAX_BOSS do
-        local f = BW.BossFrames[i]
+    for i = 1, BossW.MAX_BOSS do
+        local f = BossW.BossFrames[i]
         if f then
             setF(f.nameText,   size,     outline)
             setF(f.healthText, size,     outline)
@@ -395,13 +395,13 @@ end
 -- ============================================================
 -- LOCALIZATION (lazy, fallback returns the key)
 -- ============================================================
-BW.L = setmetatable({}, { __index = function(t, k) return k end })
+BossW.L = setmetatable({}, { __index = function(t, k) return k end })
 
 -- ============================================================
 -- HIDE BLIZZARD BOSS FRAMES
 -- ============================================================
 local blizzardHidden = false
-function BW:HideBlizzardBossFrames()
+function BossW:HideBlizzardBossFrames()
     if blizzardHidden then return end
     blizzardHidden = true
     local container = _G["BossTargetFrameContainer"] or _G["BossFrameContainer"]
@@ -410,7 +410,7 @@ function BW:HideBlizzardBossFrames()
         container:Hide()
         container.Show = function() end
     end
-    for i = 1, BW.MAX_BOSS do
+    for i = 1, BossW.MAX_BOSS do
         for _, n in ipairs({ "Boss" .. i .. "TargetFrame", "BossTargetFrame" .. i }) do
             local f = _G[n]
             if f then
@@ -425,28 +425,29 @@ end
 -- ============================================================
 -- SLASH COMMAND
 -- ============================================================
-SLASH_BOSSWATCH1 = "/bw"
+SLASH_BOSSWATCH1 = "/bossw"
+SLASH_BOSSWATCH2 = "/bosswatch"
 SlashCmdList["BOSSWATCH"] = function(msg)
     msg = (msg or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
     if msg == "" or msg == "config" or msg == "options" then
-        if BW.ToggleOptions then BW:ToggleOptions() end
+        if BossW.ToggleOptions then BossW:ToggleOptions() end
         return
     end
     local cmd, arg = msg:match("^(%S+)%s*(.*)$")
     if cmd == "test" then
-        if BW.SetTestMode then BW:SetTestMode(tonumber(arg) or 5) end
+        if BossW.SetTestMode then BossW:SetTestMode(tonumber(arg) or 5) end
     elseif cmd == "mover" then
-        if BW.ToggleMover then BW:ToggleMover() end
+        if BossW.ToggleMover then BossW:ToggleMover() end
     elseif cmd == "reset" then
         BossWatchDB = nil
         ReloadUI()
     else
-        local L = BW.L
+        local L = BossW.L
         print("|cffeda55fBossWatch:|r " .. L["commands:"])
-        print("  /bw            - " .. L["open options"])
-        print("  /bw mover      - " .. L["toggle mover"])
-        print("  /bw test N     - " .. L["simulate N bosses (0-5)"])
-        print("  /bw reset      - " .. L["reset all settings + reload"])
+        print("  /bossw            - " .. L["open options"])
+        print("  /bossw mover      - " .. L["toggle mover"])
+        print("  /bossw test N     - " .. L["simulate N bosses (0-5)"])
+        print("  /bossw reset      - " .. L["reset all settings + reload"])
     end
 end
 
@@ -455,8 +456,8 @@ end
 -- ============================================================
 local init = CreateFrame("Frame")
 init:RegisterEvent("PLAYER_LOGIN")
-function BW:RegisterMinimapIcon()
-    if BW._minimapRegistered then return end
+function BossW:RegisterMinimapIcon()
+    if BossW._minimapRegistered then return end
     local LDB = LibStub and LibStub("LibDataBroker-1.1", true)
     local Icon = LibStub and LibStub("LibDBIcon-1.0", true)
     if not LDB or not Icon then return end
@@ -467,22 +468,22 @@ function BW:RegisterMinimapIcon()
         icon = "Interface\\AddOns\\BossWatch\\Media\\minimap.png",
         OnClick = function(_, button)
             if button == "RightButton" then
-                if BW.ToggleMover then BW:ToggleMover() end
+                if BossW.ToggleMover then BossW:ToggleMover() end
             else
-                if BW.ToggleOptions then BW:ToggleOptions() end
+                if BossW.ToggleOptions then BossW:ToggleOptions() end
             end
         end,
         OnTooltipShow = function(tip)
             tip:AddLine("|cffeda55fBossWatch|r")
-            tip:AddLine("|cffaaaaaa" .. (BW.L["left-click: options"] or "left-click: options") .. "|r")
-            tip:AddLine("|cffaaaaaa" .. (BW.L["right-click: toggle mover"] or "right-click: toggle mover") .. "|r")
+            tip:AddLine("|cffaaaaaa" .. (BossW.L["left-click: options"] or "left-click: options") .. "|r")
+            tip:AddLine("|cffaaaaaa" .. (BossW.L["right-click: toggle mover"] or "right-click: toggle mover") .. "|r")
         end,
     })
     Icon:Register("BossWatch", broker, BossWatchDB.minimap)
-    BW._minimapRegistered = true
+    BossW._minimapRegistered = true
 end
 
-function BW:ToggleMinimapIcon(show)
+function BossW:ToggleMinimapIcon(show)
     BossWatchDB.minimap = BossWatchDB.minimap or { hide = true }
     BossWatchDB.minimap.hide = not show
     local Icon = LibStub and LibStub("LibDBIcon-1.0", true)
@@ -492,11 +493,11 @@ function BW:ToggleMinimapIcon(show)
 end
 
 init:SetScript("OnEvent", function()
-    BW:GetDB()
-    if BW.EnsureCreated then BW:EnsureCreated() end
-    if BW.ApplyFonts then BW:ApplyFonts() end
-    if BW.RegisterMinimapIcon then BW:RegisterMinimapIcon() end
-    if BW.RegisterBlizzardSettings then BW:RegisterBlizzardSettings() end
-    print(format(BW.L["|cffeda55fBossWatch|r v%s loaded — type |cffffff00/bw|r for options"],
+    BossW:GetDB()
+    if BossW.EnsureCreated then BossW:EnsureCreated() end
+    if BossW.ApplyFonts then BossW:ApplyFonts() end
+    if BossW.RegisterMinimapIcon then BossW:RegisterMinimapIcon() end
+    if BossW.RegisterBlizzardSettings then BossW:RegisterBlizzardSettings() end
+    print(format(BossW.L["|cffeda55fBossWatch|r v%s loaded — type |cffffff00/bossw|r for options"],
         C_AddOns and C_AddOns.GetAddOnMetadata(addonName, "Version") or "?"))
 end)

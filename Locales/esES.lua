@@ -1,9 +1,9 @@
-local addonName, BW = ...
+local addonName, BossW = ...
 
 local locale = GetLocale()
 if locale ~= "esES" and locale ~= "esMX" then return end
 
-local L = BW.L
+local L = BossW.L
 
 -- TABS
 L["Layout"]      = "Diseño"
@@ -166,15 +166,15 @@ L["Above icon"]         = "Encima del icono"
 L["Custom boss target frames — v%s\nClick the button below to open the BossWatch configuration panel."] =
     "Marcos de jefe personalizados — v%s\nHaz clic en el botón de abajo para abrir el panel de configuración de BossWatch."
 L["Open BossWatch options"]                = "Abrir opciones de BossWatch"
-L["You can also use the slash command: /bw"] = "También puedes usar el comando: /bw"
+L["You can also use the slash command: /bossw"] = "También puedes usar el comando: /bossw"
 
 L["commands:"]                  = "comandos:"
 L["open options"]               = "abrir opciones"
 L["toggle mover"]               = "mostrar/ocultar mover"
 L["simulate N bosses (0-5)"]    = "simular N jefes (0 a 5)"
 L["reset all settings + reload"] = "restablecer todos los ajustes y recargar UI"
-L["|cffeda55fBossWatch|r v%s loaded — type |cffffff00/bw|r for options"] =
-    "|cffeda55fBossWatch|r v%s cargado — escribe |cffffff00/bw|r para las opciones"
+L["|cffeda55fBossWatch|r v%s loaded — type |cffffff00/bossw|r for options"] =
+    "|cffeda55fBossWatch|r v%s cargado — escribe |cffffff00/bossw|r para las opciones"
 
 L["Custom boss target frames for WoW Retail / Midnight 12.0."] =
     "Marcos de jefe personalizados para WoW Retail / Midnight 12.0."
