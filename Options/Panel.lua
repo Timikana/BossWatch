@@ -1580,22 +1580,6 @@ local function buildAboutPage(page)
     end)
     addTooltip(btnResetWin, L["Reset the options window to its default size and position."])
 
-    -- Sister-addon switcher: shown only if TankWatch is loaded. One-click jump
-    -- to its options panel (and we close ours).
-    local isTWLoaded = C_AddOns and C_AddOns.IsAddOnLoaded and C_AddOns.IsAddOnLoaded("TankWatch")
-    local twToggle = _G.TW and _G.TW.ToggleOptions
-    if isTWLoaded and twToggle then
-        local btnSwitchTW = CreateFrame("Button", nil, page, "UIPanelButtonTemplate")
-        btnSwitchTW:SetSize(180, 22)
-        btnSwitchTW:SetPoint("LEFT", btnResetWin, "RIGHT", 8, 0)
-        btnSwitchTW:SetText("|cffeda14a→|r " .. L["Open TankWatch options"])
-        btnSwitchTW:SetScript("OnClick", function()
-            if panel and panel:IsShown() then panel:Hide() end
-            _G.TW:ToggleOptions()
-        end)
-        addTooltip(btnSwitchTW, L["Close BossWatch and open the TankWatch options panel."])
-    end
-
     local cmdHeader = page:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     cmdHeader:SetPoint("TOPLEFT", 14, -500)
     cmdHeader:SetText(L["Slash commands"])
@@ -2086,6 +2070,72 @@ local function build()
     end
 
     selectTab("layout")
+
+    -- =====================================================================
+    -- Sister-addon side tabs (left edge of the panel, like the PvP / Pet
+    -- Battle frame's category tabs). The current addon's tab is the first
+    -- and stays selected; sister addons (TankWatch) appear below it ONLY if
+    -- the addon is loaded. Click a sister tab → close this panel + open theirs.
+    -- =====================================================================
+    local SIDE_TAB_SIZE = 36
+    local sideTabs = {
+        { id = "BossWatch",  isSelf = true,  icon = "Interface\\AddOns\\BossWatch\\Media\\logo.png",
+          tooltip = L["BossWatch — Options"], onClick = function() end },
+        { id = "TankWatch",  isSelf = false, icon = "Interface\\AddOns\\TankWatch\\Media\\logo.png",
+          tooltip = L["Open TankWatch options"],
+          loadedCheck = function()
+              return C_AddOns and C_AddOns.IsAddOnLoaded
+                     and C_AddOns.IsAddOnLoaded("TankWatch")
+                     and _G.TW and _G.TW.ToggleOptions
+          end,
+          onClick = function()
+              if panel and panel:IsShown() then panel:Hide() end
+              if _G.TW and _G.TW.ToggleOptions then _G.TW:ToggleOptions() end
+          end },
+    }
+
+    local visibleIdx = 0
+    for _, def in ipairs(sideTabs) do
+        if def.isSelf or (def.loadedCheck and def.loadedCheck()) then
+            visibleIdx = visibleIdx + 1
+
+            local tab = CreateFrame("Button", nil, panel)
+            tab:SetSize(SIDE_TAB_SIZE, SIDE_TAB_SIZE)
+            tab:SetPoint("TOPLEFT", panel, "TOPLEFT", -SIDE_TAB_SIZE + 4,
+                         -60 - (visibleIdx - 1) * (SIDE_TAB_SIZE + 4))
+
+            local bg = tab:CreateTexture(nil, "BACKGROUND")
+            bg:SetAllPoints(tab)
+            bg:SetColorTexture(0.05, 0.05, 0.06, 0.9)
+
+            local border = CreateFrame("Frame", nil, tab, "BackdropTemplate")
+            border:SetAllPoints(tab)
+            border:SetBackdrop({ edgeFile = "Interface\\Buttons\\WHITE8x8", edgeSize = 1 })
+            border:SetBackdropBorderColor(0.35, 0.35, 0.40, 1)
+
+            local icon = tab:CreateTexture(nil, "ARTWORK")
+            icon:SetPoint("TOPLEFT",     tab, "TOPLEFT",     3, -3)
+            icon:SetPoint("BOTTOMRIGHT", tab, "BOTTOMRIGHT", -3, 3)
+            icon:SetTexture(def.icon)
+            icon:SetTexCoord(0, 1, 0, 1)
+
+            if def.isSelf then
+                -- "Selected" look on the active addon's tab
+                border:SetBackdropBorderColor(1, 0.82, 0, 1)
+                tab:EnableMouse(false)
+            else
+                tab:HookScript("OnEnter", function()
+                    border:SetBackdropBorderColor(1, 0.82, 0, 1)
+                end)
+                tab:HookScript("OnLeave", function()
+                    border:SetBackdropBorderColor(0.35, 0.35, 0.40, 1)
+                end)
+                tab:SetScript("OnClick", def.onClick)
+            end
+
+            addTooltip(tab, def.tooltip)
+        end
+    end
 end
 
 function BW:ToggleOptions()
