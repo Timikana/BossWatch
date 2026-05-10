@@ -7,6 +7,17 @@ local pairs, ipairs = pairs, ipairs
 local panel
 local refresh = function() if BW.RefreshAll then BW:RefreshAll() end end
 
+-- Module-level pointer used by widget factories to auto-register with the
+-- currently-being-built section. Each makeSection() updates this; each
+-- makeXxx() factory pushes itself onto _currentSection.children/dbKeys.
+local _currentSection = nil
+local function _registerInSection(widget, dbKey)
+    if _currentSection and widget then
+        _currentSection.children[#_currentSection.children + 1] = widget
+        if dbKey then _currentSection.dbKeys[#_currentSection.dbKeys + 1] = dbKey end
+    end
+end
+
 -- ============================================================
 -- "NEW" BADGE
 -- ============================================================
@@ -113,6 +124,7 @@ local function makeSlider(parent, label, key, minV, maxV, step, x, y, width)
     end, sl)
 
     sl.refresh = function() sl:Init(readDB(), minV, maxV, numSteps, formatters) end
+    _registerInSection(sl, key)
     return sl
 end
 
@@ -127,6 +139,7 @@ local function makeCheck(parent, label, key, x, y)
         BW:GetDB()[key] = self:GetChecked() and true or false
         refresh()
     end)
+    _registerInSection(cb, key)
     return cb
 end
 
@@ -153,6 +166,9 @@ local function makeDropdown(parent, label, key, options, x, y, width)
         end
     end)
     dd.refresh = function() dd:GenerateMenu() end
+    dd._labelFS = labelFS
+    _registerInSection(dd, key)
+    _registerInSection(labelFS)
     return dd
 end
 
@@ -357,6 +373,14 @@ local function makeMediaDropdown(parent, label, key, mediaType, x, y, width, tin
         applyPreview(cur)
     end
     btn.refresh()
+    -- Register all the sibling regions of the media dropdown so that collapsing
+    -- the section hides the label and the preview as well, not just the button.
+    _registerInSection(btn, key)
+    _registerInSection(labelFS)
+    _registerInSection(previewBg)
+    _registerInSection(previewBorder)
+    if previewTex then _registerInSection(previewTex) end
+    if previewText then _registerInSection(previewText) end
     return btn
 end
 
@@ -459,6 +483,9 @@ local function makeColorPicker(parent, label, dbKey, x, y)
         end
     end)
 
+    btn.dbKey = dbKey
+    _registerInSection(btn, dbKey)
+    if lab then _registerInSection(lab) end
     return btn
 end
 
@@ -469,25 +496,126 @@ end
 -- Solution: defer positioning by one tick, then anchor both endpoints to
 -- parent:TOPLEFT / parent:TOPRIGHT at the exact same y, with the line's left
 -- offset computed from the actual rendered header width.
-local function makeSection(parent, title, x, y)
+-- Helper: shallow-deep copy a value so default tables (e.g. color = {r,g,b,a})
+-- aren't shared between profiles when reset.
+local function _cloneDefault(v)
+    if type(v) ~= "table" then return v end
+    local out = {}
+    for k, val in pairs(v) do out[k] = _cloneDefault(val) end
+    return out
+end
+
+local function makeSection(parent, title, x, y, key)
+    local section = {
+        children = {},
+        dbKeys = {},
+        key = key,
+    }
+
     local header = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     header:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y)
-    header:SetText(title)
     header:SetTextColor(1, 0.82, 0)
+    section.header = header
+
+    header:SetText(title)
+
+    -- Chevron (collapsed indicator) shown to the RIGHT of the title
+    local chevron = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    chevron:SetPoint("LEFT", header, "RIGHT", 4, 0)
+    chevron:SetTextColor(1, 0.82, 0)
+    chevron:SetText("")  -- set by SetCollapsed
+    section.chevron = chevron
+
+    -- Invisible click area covering the header + a slice of the divider line
+    local clickArea = CreateFrame("Button", nil, parent)
+    clickArea:SetPoint("TOPLEFT",  parent, "TOPLEFT", x - 14, y + 4)
+    clickArea:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -40,   y + 4)
+    clickArea:SetHeight(18)
+    clickArea:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    section.clickArea = clickArea
+
+    -- Reset section button (small ↺) on the right side of the divider
+    local btnReset = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
+    btnReset:SetSize(20, 18)
+    btnReset:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -16, y + 2)
+    btnReset:SetText("↺")
+    section.resetBtn = btnReset
 
     local line = parent:CreateTexture(nil, "OVERLAY")
     line:SetHeight(1)
     line:SetColorTexture(1, 0.82, 0, 0.55)
+    section.line = line
 
     local function place()
-        local w = header:GetStringWidth() or 0
+        local hw = header:GetStringWidth() or 0
+        local cw = chevron:GetStringWidth() or 0
+        local startX = x + hw + (cw > 0 and (4 + cw) or 0) + 10
         line:ClearAllPoints()
-        line:SetPoint("TOPLEFT",  parent, "TOPLEFT",  x + w + 10, y - 7)
-        line:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -14,        y - 7)
+        line:SetPoint("TOPLEFT",  parent, "TOPLEFT",  startX, y - 7)
+        line:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -42,    y - 7)
     end
+
+    function section:SetCollapsed(state, persist)
+        state = state and true or false
+        for _, w in ipairs(self.children) do
+            if state then
+                if w.Hide then w:Hide() end
+            else
+                if w.Show then w:Show() end
+            end
+            -- The dropdown's external label is registered separately; nothing
+            -- special needed here, the loop hides/shows it like everything else.
+        end
+        chevron:SetText(state and "▸" or "▾")
+        if persist and self.key then
+            BossWatchDB = BossWatchDB or {}
+            BossWatchDB.collapsedSections = BossWatchDB.collapsedSections or {}
+            BossWatchDB.collapsedSections[self.key] = state or nil
+        end
+        self._collapsed = state
+    end
+
+    function section:Toggle()
+        self:SetCollapsed(not self._collapsed, true)
+    end
+
+    function section:ResetToDefaults()
+        local db = BW:GetDB()
+        for _, k in ipairs(self.dbKeys) do
+            local def = (BW.Defaults or {})[k]
+            if def ~= nil then db[k] = _cloneDefault(def) end
+        end
+        if BW.RefreshAll then BW:RefreshAll() end
+        if BW.ApplyFonts then BW:ApplyFonts() end
+        if panel and panel.refreshAll then panel.refreshAll() end
+    end
+
+    clickArea:SetScript("OnClick", function() section:Toggle() end)
+    btnReset:SetScript("OnClick", function() section:ResetToDefaults() end)
+
+    -- Initial collapsed state from DB
+    BossWatchDB = BossWatchDB or {}
+    local restored = BossWatchDB.collapsedSections and key and BossWatchDB.collapsedSections[key]
+    section:SetCollapsed(restored or false, false)
+
+    -- Always include the section's own visual elements so they hide too when
+    -- the user collapses upstream sections. Header + line stay visible always
+    -- (clickable), so we DON'T register them.
+    -- chevron stays visible (shows state).
+    -- btnReset stays visible (lets user reset even when collapsed).
+
     place()
-    C_Timer.After(0, place)  -- re-run once layout pass has computed string width
-    return header
+    C_Timer.After(0, place)
+
+    -- Tooltips on the header + reset
+    if addTooltip then
+        addTooltip(clickArea, L["Click to collapse/expand this section."])
+        addTooltip(btnReset,  L["Reset this section to default values."])
+    end
+
+    -- This section is now the active one; subsequent makeXxx widgets register here.
+    _currentSection = section
+    return section
 end
 
 -- Hover tooltip helper. Hooks the widget AND any well-known child controls
@@ -568,17 +696,19 @@ local function buildLayoutPage(page)
     local y = -8
 
     -- ============ ACTIONS ============
-    makeSection(page, L["Actions"], 14, y); y = y - 22
+    makeSection(page, L["Actions"], 14, y, "layout.actions"); y = y - 22
 
     local btnMover = CreateFrame("Button", nil, page, "UIPanelButtonTemplate")
     btnMover:SetSize(160, 22); btnMover:SetPoint("TOPLEFT", 14, y)
     btnMover:SetText(L["Unlock / Lock Mover"])
     btnMover:SetScript("OnClick", function() BW:ToggleMover() end)
     addTooltip(btnMover, L["Toggle a draggable handle on the boss frames container so you can move it on screen."])
+    _registerInSection(btnMover)
 
     local label = page:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     label:SetPoint("TOPLEFT", 184, y - 4)
     label:SetText(L["Test:"])
+    _registerInSection(label)
 
     local function currentTestCount()
         local n = 0
@@ -607,13 +737,14 @@ local function buildLayoutPage(page)
         addTooltip(b, count == 0 and L["Stop the simulation."]
             or format(L["Simulate %d boss frame(s) with fake HP, casts and auras."], count))
         testBtns[#testBtns + 1] = b
+        _registerInSection(b)
         xs = xs + 38
     end
     refreshTestBtns()
 
     -- ============ GENERAL ============
     y = y - 36
-    makeSection(page, L["General"], 14, y); y = y - 24
+    makeSection(page, L["General"], 14, y, "layout.general"); y = y - 24
 
     addTooltip(makeCheck(page, L["Enable"], "enabled", 14, y),
         L["Master switch for the addon. When off, BossWatch frames stay hidden."])
@@ -634,10 +765,11 @@ local function buildLayoutPage(page)
         cbMini:SetChecked(BossWatchDB and BossWatchDB.minimap and not BossWatchDB.minimap.hide)
     end
     addTooltip(cbMini, L["Show a minimap button to open the options. Left-click: options, right-click: toggle mover."])
+    _registerInSection(cbMini)
 
     -- ============ LAYOUT STYLE ============
     y = y - 60
-    makeSection(page, L["Layout style"], 14, y); y = y - 24
+    makeSection(page, L["Layout style"], 14, y, "layout.style"); y = y - 24
 
     addTooltip(markAsNew(makeDropdown(page, L["Layout"], "layoutBlocks", {
         { text = L["3 blocks (compact)"],     value = 3 },
@@ -655,7 +787,7 @@ local function buildLayoutPage(page)
 
     -- ============ POSITION ============
     y = y - 60
-    makeSection(page, L["Position"], 14, y); y = y - 24
+    makeSection(page, L["Position"], 14, y, "layout.position"); y = y - 24
 
     addTooltip(makeDropdown(page, L["Anchor"], "anchor", ANCHOR9(), 14, y),
         L["Anchor point on the screen used as origin for the X/Y offsets."])
@@ -670,7 +802,7 @@ local function buildLayoutPage(page)
 
     -- ============ DIMENSIONS ============
     y = y - 60
-    makeSection(page, L["Dimensions"], 14, y); y = y - 24
+    makeSection(page, L["Dimensions"], 14, y, "layout.dimensions"); y = y - 24
 
     addTooltip(makeSlider(page, L["Width"],  "frameWidth",  100, 400, 1, 14, y),
         L["Width of each boss frame in pixels."])
@@ -684,7 +816,7 @@ local function buildLayoutPage(page)
 
     -- ============ TARGET HIGHLIGHT ============
     y = y - 60
-    makeSection(page, L["Target Highlight"], 14, y); y = y - 24
+    makeSection(page, L["Target Highlight"], 14, y, "layout.targetHL"); y = y - 24
 
     addTooltip(markAsNew(makeCheck(page, L["Highlight current target"], "targetHighlight", 14, y), "targetHighlight"),
         L["Add a colored border around the boss frame matching your current target."])
@@ -708,7 +840,7 @@ local function buildBarsPage(page)
     local y = -8
 
     -- ============ HEALTH ============
-    makeSection(page, L["Health"], 14, y); y = y - 24
+    makeSection(page, L["Health"], 14, y, "bars.health"); y = y - 24
     addTooltip(makeMediaDropdown(page, L["Health Texture"], "healthTexture", "statusbar", 14, y, 180, {0.9, 0.2, 0.2}),
         L["Status bar texture used for the boss health bar."])
     y = y - 50
@@ -725,7 +857,7 @@ local function buildBarsPage(page)
 
     -- ============ POWER ============
     y = y - 60
-    makeSection(page, L["Power"], 14, y); y = y - 24
+    makeSection(page, L["Power"], 14, y, "bars.power"); y = y - 24
     addTooltip(makeCheck(page, L["Show Power Bar"], "showPowerBar", 14, y),
         L["Display the power bar below the health bar."])
     y = y - 30
@@ -739,7 +871,7 @@ local function buildBarsPage(page)
 
     -- ============ ABSORBS ============
     y = y - 60
-    makeSection(page, L["Absorbs"] .. " |cffff4040(" .. (L["Experimental"] or "Experimental") .. ")|r", 14, y); y = y - 24
+    makeSection(page, L["Absorbs"] .. " |cffff4040(" .. (L["Experimental"] or "Experimental") .. ")|r", 14, y, "bars.absorbs"); y = y - 24
     addTooltip(markAsNew(makeCheck(page, L["Show absorbs / shields"], "showAbsorbs", 14, y), "showAbsorbs"),
         L["Display incoming damage absorbs (shields, bubbles) as a translucent overlay extending the health bar. May not show on bosses with secret-tagged values."])
     addTooltip(markAsNew(makeColorPicker(page, L["Absorb color"], "absorbColor", 280, y), "absorbColor"),
@@ -750,7 +882,7 @@ local function buildBarsPage(page)
 
     -- ============ BACKGROUND ============
     y = y - 60
-    makeSection(page, L["Background"], 14, y); y = y - 24
+    makeSection(page, L["Background"], 14, y, "bars.background"); y = y - 24
     addTooltip(markAsNew(makeMediaDropdown(page, L["Background Texture"], "barBackgroundTexture", "statusbar", 14, y, 180), "barBackgroundTexture"),
         L["Texture used behind the bars (the empty / dark portion)."])
     y = y - 50
@@ -766,7 +898,7 @@ local function buildCastPage(page)
     local y = -8
 
     -- ============ DISPLAY ============
-    makeSection(page, L["Display"], 14, y); y = y - 24
+    makeSection(page, L["Display"], 14, y, "cast.display"); y = y - 24
     addTooltip(makeCheck(page, L["Show Cast Bar"], "showCastBar", 14, y),
         L["Show a cast bar under the boss frame when it's casting."])
     addTooltip(makeCheck(page, L["Detached"], "castBarDetached", 184, y),
@@ -782,14 +914,14 @@ local function buildCastPage(page)
 
     -- ============ SPELL ICON ============
     y = y - 60
-    makeSection(page, L["Spell Icon"], 14, y); y = y - 24
+    makeSection(page, L["Spell Icon"], 14, y, "cast.spellicon"); y = y - 24
     addTooltip(makeDropdown(page, L["Icon Position"], "castBarIconPosition", {
         { text = L["Left"], value = "LEFT" }, { text = L["Right"], value = "RIGHT" },
     }, 14, y), L["Side of the cast bar where the spell icon is shown."])
 
     -- ============ DETACHED POSITION ============
     y = y - 60
-    makeSection(page, L["Detached Position"], 14, y); y = y - 24
+    makeSection(page, L["Detached Position"], 14, y, "cast.detached"); y = y - 24
     addTooltip(makeDropdown(page, L["Detached Anchor"], "castBarDetachedAnchor", ANCHOR9(), 14, y),
         L["Screen anchor used as origin when the cast bar is detached."])
     addTooltip(makeSlider(page, L["Detached Width (0=auto)"], "castBarDetachedWidth", 0, 400, 1, 260, y),
@@ -812,7 +944,7 @@ local function buildTextPage(page)
     }
 
     -- ============ NAME ============
-    makeSection(page, L["Name"], 14, y); y = y - 24
+    makeSection(page, L["Name"], 14, y, "text.name"); y = y - 24
     addTooltip(makeCheck(page, L["Show Name"], "showName", 14, y),
         L["Show the boss name on the frame."])
     addTooltip(makeDropdown(page, L["Name Position"], "nameAnchor", ANCHOR9(), 184, y),
@@ -828,7 +960,7 @@ local function buildTextPage(page)
 
     -- ============ HEALTH TEXT ============
     y = y - 60
-    makeSection(page, L["Health Text"], 14, y); y = y - 24
+    makeSection(page, L["Health Text"], 14, y, "text.health"); y = y - 24
     addTooltip(makeCheck(page, L["Show Health Text"], "showHealthText", 14, y),
         L["Display HP value as text on the health bar."])
     addTooltip(makeDropdown(page, L["HP text position"], "healthTextAnchor", ANCHOR9(), 184, y),
@@ -844,7 +976,7 @@ local function buildTextPage(page)
 
     -- ============ POWER TEXT ============
     y = y - 60
-    makeSection(page, L["Power Text"], 14, y); y = y - 24
+    makeSection(page, L["Power Text"], 14, y, "text.power"); y = y - 24
     addTooltip(makeCheck(page, L["Show Power Text"], "showPowerText", 14, y),
         L["Display power value as text on the power bar."])
     -- Power on hostile bosses returns secret-tagged values: arithmetic and
@@ -859,7 +991,7 @@ local function buildTextPage(page)
 
     -- ============ FONT ============
     y = y - 60
-    makeSection(page, L["Font (applies to all text)"], 14, y); y = y - 24
+    makeSection(page, L["Font (applies to all text)"], 14, y, "text.font"); y = y - 24
     addTooltip(makeMediaDropdown(page, L["Font"], "fontFace", "font", 14, y, 180),
         L["Font used for every text on the boss frames."])
     y = y - 56
@@ -876,7 +1008,7 @@ end
 local function buildRaidMarkerPage(page)
     local y = -8
 
-    makeSection(page, L["Raid Target Icon"], 14, y); y = y - 24
+    makeSection(page, L["Raid Target Icon"], 14, y, "raid.icon"); y = y - 24
 
     local note = page:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     note:SetPoint("TOPLEFT", 14, y)
@@ -905,7 +1037,7 @@ local function buildAurasPage(page)
     local y = -8
 
     -- ============ FILTER ============
-    makeSection(page, L["Filter"], 14, y); y = y - 24
+    makeSection(page, L["Filter"], 14, y, "auras.filter"); y = y - 24
     addTooltip(makeCheck(page, L["Show Auras"], "showAuras", 14, y),
         L["Show buffs or debuffs on the boss frame."])
     addTooltip(makeDropdown(page, L["Filter"], "aurasFilter", {
@@ -922,7 +1054,7 @@ local function buildAurasPage(page)
 
     -- ============ SIZE ============
     y = y - 60
-    makeSection(page, L["Size"], 14, y); y = y - 24
+    makeSection(page, L["Size"], 14, y, "auras.size"); y = y - 24
     addTooltip(makeSlider(page, L["Max Count"], "aurasMaxCount", 1, 8, 1, 14, y),
         L["Maximum number of aura icons displayed per frame."])
     addTooltip(makeSlider(page, L["Size"], "aurasSize", 12, 48, 1, 260, y),
@@ -933,7 +1065,7 @@ local function buildAurasPage(page)
 
     -- ============ LAYOUT ============
     y = y - 60
-    makeSection(page, L["Layout"], 14, y); y = y - 24
+    makeSection(page, L["Layout"], 14, y, "auras.layout"); y = y - 24
     addTooltip(makeDropdown(page, L["Anchor"], "aurasAnchor", ANCHOR9(), 14, y),
         L["Where the aura row attaches on the boss frame."])
     addTooltip(makeDropdown(page, L["Grow X"], "aurasGrowX", {
@@ -948,7 +1080,7 @@ local function buildAurasPage(page)
 
     -- ============ DISPLAY ============
     y = y - 60
-    makeSection(page, L["Display"], 14, y); y = y - 24
+    makeSection(page, L["Display"], 14, y, "auras.display"); y = y - 24
     addTooltip(makeCheck(page, L["Show Stacks"], "aurasShowStacks", 14, y),
         L["Display aura stack count when applicable."])
     addTooltip(makeCheck(page, L["Show Timer"],  "aurasShowTimer",  184, y),
@@ -993,6 +1125,7 @@ local function showConfirmPopup(text, onAccept)
 end
 
 local function buildProfilesPage(page)
+    _currentSection = nil  -- this page has no makeSection — widgets shouldn't register
     local y = -10
 
     -- Character label
@@ -1187,6 +1320,7 @@ local function buildProfilesPage(page)
 end
 
 local function buildAboutPage(page)
+    _currentSection = nil  -- this page has no makeSection — widgets shouldn't register
     local version = C_AddOns and C_AddOns.GetAddOnMetadata(addonName, "Version") or "?"
     local author  = C_AddOns and C_AddOns.GetAddOnMetadata(addonName, "Author")  or "Timikana"
 
@@ -1261,6 +1395,23 @@ local function buildAboutPage(page)
     end, alphaSlider)
     addTooltip(alphaSlider, L["Opacity of this options window. Saved account-wide."])
 
+    -- Reset window size/position button (account-wide)
+    local btnResetWin = CreateFrame("Button", nil, page, "UIPanelButtonTemplate")
+    btnResetWin:SetSize(160, 22)
+    btnResetWin:SetPoint("TOPLEFT", page, "TOPLEFT", 260, -440)
+    btnResetWin:SetText(L["Reset window size"])
+    btnResetWin:SetScript("OnClick", function()
+        BossWatchDB.panelW = nil
+        BossWatchDB.panelH = nil
+        BossWatchDB.panelPoint = nil
+        if panel then
+            panel:SetSize(720, 620)
+            panel:ClearAllPoints()
+            panel:SetPoint("CENTER")
+        end
+    end)
+    addTooltip(btnResetWin, L["Reset the options window to its default size and position."])
+
     local cmdHeader = page:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     cmdHeader:SetPoint("TOPLEFT", 14, -500)
     cmdHeader:SetText(L["Slash commands"])
@@ -1290,15 +1441,52 @@ end
 local function build()
     -- Modern Blizzard 11.0 portrait frame (used by Item Upgrades, Adventure Guide, etc.)
     panel = CreateFrame("Frame", "BossWatchOptions", UIParent, "PortraitFrameTemplate")
-    panel:SetSize(720, 620)
-    panel:SetPoint("CENTER")
+    BossWatchDB = BossWatchDB or {}
+    local startW = math.max(720, BossWatchDB.panelW or 720)
+    local startH = math.max(500, BossWatchDB.panelH or 620)
+    panel:SetSize(startW, startH)
+    if BossWatchDB.panelPoint then
+        local p = BossWatchDB.panelPoint
+        panel:ClearAllPoints()
+        panel:SetPoint(p.point or "CENTER", UIParent, p.relPoint or "CENTER", p.x or 0, p.y or 0)
+    else
+        panel:SetPoint("CENTER")
+    end
     panel:SetMovable(true); panel:EnableMouse(true)
     panel:RegisterForDrag("LeftButton")
     panel:SetScript("OnDragStart", panel.StartMoving)
-    panel:SetScript("OnDragStop", panel.StopMovingOrSizing)
+    panel:SetScript("OnDragStop", function(self)
+        self:StopMovingOrSizing()
+        local point, _, relPoint, x, y = self:GetPoint(1)
+        BossWatchDB.panelPoint = { point = point, relPoint = relPoint,
+                                   x = math.floor((x or 0) + 0.5),
+                                   y = math.floor((y or 0) + 0.5) }
+    end)
     panel:SetFrameStrata("HIGH")
     panel:Hide()
     panel:SetClampedToScreen(true)
+    panel:SetResizable(true)
+    if panel.SetResizeBounds then
+        panel:SetResizeBounds(720, 500, 1400, 1100)
+    end
+
+    -- Resize grip (bottom-right)
+    local grip = CreateFrame("Button", nil, panel)
+    grip:SetSize(16, 16)
+    grip:SetPoint("BOTTOMRIGHT", -4, 4)
+    grip:SetFrameLevel(panel:GetFrameLevel() + 10)
+    grip:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
+    grip:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
+    grip:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
+    grip:SetScript("OnMouseDown", function(_, btn)
+        if btn == "LeftButton" then panel:StartSizing("BOTTOMRIGHT") end
+    end)
+    grip:SetScript("OnMouseUp", function()
+        panel:StopMovingOrSizing()
+        BossWatchDB.panelW = math.floor(panel:GetWidth() + 0.5)
+        BossWatchDB.panelH = math.floor(panel:GetHeight() + 0.5)
+    end)
+    addTooltip(grip, L["Drag to resize the options window. Saved account-wide."])
     -- Close on Escape (Blizzard's UI special-frames list)
     tinsert(UISpecialFrames, "BossWatchOptions")
 
@@ -1338,9 +1526,14 @@ local function build()
         sf:Hide()
 
         local content = CreateFrame("Frame", nil, sf)
-        content:SetSize(680, 900)
+        content:SetSize(sf:GetWidth() > 0 and sf:GetWidth() or 680, 900)
         sf:SetScrollChild(content)
         sf.content = content
+        -- Content width must follow scroll viewport so section dividers
+        -- and the scrollbar don't clip when the panel is resized.
+        sf:SetScript("OnSizeChanged", function(self, w, _)
+            if w and w > 0 and self.content then self.content:SetWidth(w) end
+        end)
         return sf
     end
 

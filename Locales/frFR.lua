@@ -376,6 +376,11 @@ L["Click to select, then Ctrl+C to copy."]                                      
 L["Export string for the active profile. Click Select All then Ctrl+C to copy."]     = "Chaîne d'export du profil actif. Clic sur Tout sélectionner puis Ctrl+C pour copier."
 L["Paste a profile export string here, then click Import to create a new profile."]   = "Collez ici une chaîne d'export, puis cliquez sur Importer pour créer un nouveau profil."
 L["Open the floating BossWatch options panel."]                                      = "Ouvre le panneau d'options flottant de BossWatch."
+L["Drag to resize the options window. Saved account-wide."]                          = "Glisser pour redimensionner la fenêtre d'options. Sauvegardé pour tout le compte."
+L["Click to collapse/expand this section."]                                          = "Cliquer pour replier/déplier cette section."
+L["Reset this section to default values."]                                           = "Réinitialiser cette section aux valeurs par défaut."
+L["Reset window size"]                                                               = "Réinitialiser la fenêtre"
+L["Reset the options window to its default size and position."]                      = "Remet la fenêtre d'options à sa taille et sa position par défaut."
 
 -- ============================================================
 -- SECTION HEADERS (UI reorg)
