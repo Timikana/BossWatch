@@ -60,15 +60,41 @@ local function _captureAndReparent(widget, container, sectionOriginY)
     widget:ClearAllPoints()
     widget._homeContainer = container
     widget._homeAnchors = {}
+
+    -- Auto-flow: widgets that were originally placed in the right column
+    -- (x >= 240 in the 672-wide reference layout) get re-anchored to the
+    -- container's TOPRIGHT instead of TOPLEFT, preserving their original
+    -- right-edge offset. As the panel resizes wider, the right-column
+    -- widgets slide along with the right edge instead of leaving dead space.
+    local COL2_THRESHOLD = 240
+    local REFERENCE_W    = 672
+
     for i, a in ipairs(saved) do
-        local newY = a.y
-        local relTo = a.relTo
+        local newY    = a.y
+        local relTo   = a.relTo
+        local newP    = a.p
+        local newRP   = a.relPoint
+        local newX    = a.x
         if a.relTo == pageRoot or a.relTo == nil then
             relTo = container
-            newY = a.y - sectionOriginY
+            newY  = a.y - sectionOriginY
+            -- Convert col2 page-relative anchors to TOPRIGHT-relative.
+            -- Skip FontStrings/Textures: their width is content-driven and
+            -- changes the anchor point ambiguously, which breaks chained
+            -- widgets (a dropdown body anchored to its label, etc.).
+            local oType   = (widget.GetObjectType and widget:GetObjectType()) or ""
+            local widgetW = (widget.GetWidth and widget:GetWidth()) or 0
+            local isFrame = oType ~= "FontString" and oType ~= "Texture"
+            if isFrame and a.x >= COL2_THRESHOLD and widgetW > 0 and a.p == "TOPLEFT" then
+                local rightMargin = REFERENCE_W - (a.x + widgetW)
+                if rightMargin < 4 then rightMargin = 4 end
+                newP  = "TOPRIGHT"
+                newRP = "TOPRIGHT"
+                newX  = -rightMargin
+            end
         end
-        widget:SetPoint(a.p, relTo, a.relPoint, a.x, newY)
-        widget._homeAnchors[i] = { p = a.p, relTo = relTo, relPoint = a.relPoint, x = a.x, y = newY }
+        widget:SetPoint(newP, relTo, newRP, newX, newY)
+        widget._homeAnchors[i] = { p = newP, relTo = relTo, relPoint = newRP, x = newX, y = newY }
     end
 end
 
