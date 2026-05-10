@@ -1,11 +1,11 @@
-local addonName, BW = ...
-local L = BW.L
+local addonName, BossW = ...
+local L = BossW.L
 
 local CreateFrame = CreateFrame
 local pairs, ipairs = pairs, ipairs
 
 local panel
-local refresh = function() if BW.RefreshAll then BW:RefreshAll() end end
+local refresh = function() if BossW.RefreshAll then BossW:RefreshAll() end end
 
 -- Forward-declare so that helpers defined earlier in the file (makeSection,
 -- factories) can capture the same local — otherwise Lua resolves the name
@@ -201,7 +201,7 @@ local function makeSlider(parent, label, key, minV, maxV, step, x, y, width)
 
     local numSteps = math.max(1, math.floor((maxV - minV) / step + 0.5))
     local function readDB()
-        local v = BW:GetDB()[key]
+        local v = BossW:GetDB()[key]
         if type(v) ~= "number" then v = minV end
         if v < minV then v = minV elseif v > maxV then v = maxV end
         return v
@@ -214,7 +214,7 @@ local function makeSlider(parent, label, key, minV, maxV, step, x, y, width)
     sl:RegisterCallback(event, function(_, value)
         if step < 1 then value = math.floor(value * 100 + 0.5) / 100
         else value = math.floor(value + 0.5) end
-        BW:GetDB()[key] = value
+        BossW:GetDB()[key] = value
         refresh()
     end, sl)
 
@@ -233,7 +233,7 @@ local function makeCheck(parent, label, key, x, y)
     cb.Text:SetText(label)
     cb.dbKey = key
     cb:SetScript("OnClick", function(self)
-        BW:GetDB()[key] = self:GetChecked() and true or false
+        BossW:GetDB()[key] = self:GetChecked() and true or false
         refresh()
     end)
     cb._searchText = label or ""
@@ -260,9 +260,9 @@ local function makeDropdown(parent, label, key, options, x, y, width)
     dd:SetupMenu(function(_, rootDescription)
         for _, opt in ipairs(options) do
             rootDescription:CreateRadio(opt.text,
-                function() return BW:GetDB()[key] == opt.value end,
+                function() return BossW:GetDB()[key] == opt.value end,
                 function()
-                    BW:GetDB()[key] = opt.value
+                    BossW:GetDB()[key] = opt.value
                     refresh()
                 end)
         end
@@ -345,9 +345,9 @@ local function makeMediaDropdown(parent, label, key, mediaType, x, y, width, tin
 
     local function applyPreview(name)
         if mediaType == "font" then
-            pcall(previewText.SetFont, previewText, BW:ResolveFont(name), 13, "")
+            pcall(previewText.SetFont, previewText, BossW:ResolveFont(name), 13, "")
         else
-            previewTex:SetTexture(BW:ResolveTexture(name))
+            previewTex:SetTexture(BossW:ResolveTexture(name))
             previewTex:SetVertexColor(TR, TG, TB, 1)
         end
     end
@@ -442,15 +442,15 @@ local function makeMediaDropdown(parent, label, key, mediaType, x, y, width, tin
             local it = getItem(i)
             it:Show()
             if mediaType == "font" then
-                pcall(it.fs.SetFont, it.fs, BW:ResolveFont(name), 13, "")
+                pcall(it.fs.SetFont, it.fs, BossW:ResolveFont(name), 13, "")
                 it.fs:SetText(name)
             else
-                it.bar:SetTexture(BW:ResolveTexture(name))
+                it.bar:SetTexture(BossW:ResolveTexture(name))
                 it.bar:SetVertexColor(TR, TG, TB, 1)
                 it.nameFS:SetText(name)
             end
             it:SetScript("OnClick", function()
-                BW:GetDB()[key] = name
+                BossW:GetDB()[key] = name
                 btnText:SetText(name)
                 applyPreview(name)
                 popup:Hide()
@@ -473,7 +473,7 @@ local function makeMediaDropdown(parent, label, key, mediaType, x, y, width, tin
     end)
 
     btn.refresh = function()
-        local cur = BW:GetDB()[key] or "Blizzard"
+        local cur = BossW:GetDB()[key] or "Blizzard"
         btnText:SetText(cur)
         applyPreview(cur)
     end
@@ -529,7 +529,7 @@ local function makeColorPicker(parent, label, dbKey, x, y)
     end)
 
     local function getColor()
-        return BW:GetDB()[dbKey] or { r = 1, g = 1, b = 1, a = 1 }
+        return BossW:GetDB()[dbKey] or { r = 1, g = 1, b = 1, a = 1 }
     end
     local function refreshSwatch()
         local c = getColor()
@@ -541,7 +541,7 @@ local function makeColorPicker(parent, label, dbKey, x, y)
     btn:SetScript("OnClick", function()
         local c = getColor()
         local function setColor(r, g, b, a)
-            BW:GetDB()[dbKey] = { r = r, g = g, b = b, a = a or 1 }
+            BossW:GetDB()[dbKey] = { r = r, g = g, b = b, a = a or 1 }
             refreshSwatch()
             refresh()
         end
@@ -748,13 +748,13 @@ local function makeSection(parent, title, x, y, key)
     end
 
     function section:ResetToDefaults()
-        local db = BW:GetDB()
+        local db = BossW:GetDB()
         for _, k in ipairs(self.dbKeys) do
-            local def = (BW.Defaults or {})[k]
+            local def = (BossW.Defaults or {})[k]
             if def ~= nil then db[k] = _cloneDefault(def) end
         end
-        if BW.RefreshAll then BW:RefreshAll() end
-        if BW.ApplyFonts then BW:ApplyFonts() end
+        if BossW.RefreshAll then BossW:RefreshAll() end
+        if BossW.ApplyFonts then BossW:ApplyFonts() end
         if panel and panel.refreshAll then panel.refreshAll() end
     end
 
@@ -835,17 +835,13 @@ local TAB_TOOLTIPS = {
 }
 
 local function makeTab(parent, id, label, idx, prevTab)
-    -- Bottom-anchored tab (like Auction House / Profession panels)
+    -- Bottom-anchored tab (like Auction House / Profession panels).
+    -- Anchoring is deferred to layoutTabs() so multi-row wrapping can apply
+    -- when the panel is too narrow to fit all tabs in a single row.
     local tab = CreateFrame("Button", "BWTab"..id, parent, "PanelTabButtonTemplate")
     tab:SetText(label)
     tab.id = id
     if PanelTemplates_TabResize then PanelTemplates_TabResize(tab, 0) end
-    if prevTab then
-        tab:SetPoint("LEFT", prevTab, "RIGHT", 2, 0)
-    else
-        tab:SetPoint("TOPLEFT", parent, "BOTTOMLEFT", 12, 2)
-    end
-    tab.id = id
     if TAB_TOOLTIPS[id] then addTooltip(tab, TAB_TOOLTIPS[id]) end
     return tab
 end
@@ -863,7 +859,7 @@ local function buildLayoutPage(page)
     local btnMover = CreateFrame("Button", nil, page, "UIPanelButtonTemplate")
     btnMover:SetSize(160, 22); btnMover:SetPoint("TOPLEFT", 14, y)
     btnMover:SetText(L["Unlock / Lock Mover"])
-    btnMover:SetScript("OnClick", function() BW:ToggleMover() end)
+    btnMover:SetScript("OnClick", function() BossW:ToggleMover() end)
     addTooltip(btnMover, L["Toggle a draggable handle on the boss frames container so you can move it on screen."])
     _registerInSection(btnMover)
 
@@ -875,7 +871,7 @@ local function buildLayoutPage(page)
     local function currentTestCount()
         local n = 0
         for i = 1, 5 do
-            if BW.BossFrames[i] and BW.BossFrames[i]._testMode then n = n + 1 end
+            if BossW.BossFrames[i] and BossW.BossFrames[i]._testMode then n = n + 1 end
         end
         return n
     end
@@ -895,7 +891,7 @@ local function buildLayoutPage(page)
         b:SetPoint("TOPLEFT", xs, y)
         b:SetText(count == 0 and L["Off"] or tostring(count))
         b._count = count
-        b:SetScript("OnClick", function() BW:SetTestMode(count); refreshTestBtns() end)
+        b:SetScript("OnClick", function() BossW:SetTestMode(count); refreshTestBtns() end)
         addTooltip(b, count == 0 and L["Stop the simulation."]
             or format(L["Simulate %d boss frame(s) with fake HP, casts and auras."], count))
         testBtns[#testBtns + 1] = b
@@ -921,7 +917,7 @@ local function buildLayoutPage(page)
     cbMini.Text:SetText(L["Show minimap icon"])
     cbMini:SetChecked(BossWatchDB and BossWatchDB.minimap and not BossWatchDB.minimap.hide)
     cbMini:SetScript("OnClick", function(self)
-        if BW.ToggleMinimapIcon then BW:ToggleMinimapIcon(self:GetChecked() and true or false) end
+        if BossW.ToggleMinimapIcon then BossW:ToggleMinimapIcon(self:GetChecked() and true or false) end
     end)
     cbMini.refresh = function()
         cbMini:SetChecked(BossWatchDB and BossWatchDB.minimap and not BossWatchDB.minimap.hide)
@@ -1299,7 +1295,7 @@ local function buildProfilesPage(page)
     -- Character label
     local charLabel = page:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     charLabel:SetPoint("TOPLEFT", 14, y)
-    charLabel:SetText(L["Character:"] .. " |cffffffff" .. (BW:GetCharKey()) .. "|r")
+    charLabel:SetText(L["Character:"] .. " |cffffffff" .. (BossW:GetCharKey()) .. "|r")
 
     y = y - 24
 
@@ -1313,11 +1309,11 @@ local function buildProfilesPage(page)
     dd:SetWidth(220)
 
     dd:SetupMenu(function(_, rootDescription)
-        for _, name in ipairs(BW:ListProfiles()) do
+        for _, name in ipairs(BossW:ListProfiles()) do
             rootDescription:CreateRadio(name,
-                function() return name == BW:GetActiveProfileName() end,
+                function() return name == BossW:GetActiveProfileName() end,
                 function()
-                    BW:SetActiveProfile(name)
+                    BossW:SetActiveProfile(name)
                     if panel and panel.refreshAll then panel.refreshAll() end
                 end)
         end
@@ -1338,9 +1334,9 @@ local function buildProfilesPage(page)
         showProfilePopup(L["Name of the new profile (copies current settings):"], "", function(name)
             name = (name or ""):gsub("^%s+", ""):gsub("%s+$", "")
             if name == "" then return end
-            local ok = BW:CreateProfile(name)
+            local ok = BossW:CreateProfile(name)
             if ok then
-                BW:SetActiveProfile(name)
+                BossW:SetActiveProfile(name)
                 profileDropdownRefresh()
                 if panel and panel.refreshAll then panel.refreshAll() end
                 print("|cffeda55fBossWatch:|r " .. format(L["profile '%s' created"], name))
@@ -1354,11 +1350,11 @@ local function buildProfilesPage(page)
     btnReset:SetText(L["Reset"])
     addTooltip(btnReset, L["Reset the active profile to default settings."])
     btnReset:SetScript("OnClick", function()
-        local name = BW:GetActiveProfileName()
+        local name = BossW:GetActiveProfileName()
         showConfirmPopup(format(L["Reset profile '%s' to defaults?"], name), function()
-            BW:ResetProfile(name)
-            if BW.RefreshAll then BW:RefreshAll() end
-            if BW.ApplyFonts then BW:ApplyFonts() end
+            BossW:ResetProfile(name)
+            if BossW.RefreshAll then BossW:RefreshAll() end
+            if BossW.ApplyFonts then BossW:ApplyFonts() end
             if panel and panel.refreshAll then panel.refreshAll() end
         end)
     end)
@@ -1369,16 +1365,16 @@ local function buildProfilesPage(page)
     btnDelete:SetText(L["Delete"])
     addTooltip(btnDelete, L["Delete the active profile (cannot delete Default)."])
     btnDelete:SetScript("OnClick", function()
-        local name = BW:GetActiveProfileName()
+        local name = BossW:GetActiveProfileName()
         if name == "Default" then
             print("|cffeda55fBossWatch:|r " .. L["cannot delete Default"])
             return
         end
         showConfirmPopup(format(L["Delete profile '%s'?"], name), function()
-            BW:DeleteProfile(name)
+            BossW:DeleteProfile(name)
             profileDropdownRefresh()
-            if BW.RefreshAll then BW:RefreshAll() end
-            if BW.ApplyFonts then BW:ApplyFonts() end
+            if BossW.RefreshAll then BossW:RefreshAll() end
+            if BossW.ApplyFonts then BossW:ApplyFonts() end
             if panel and panel.refreshAll then panel.refreshAll() end
         end)
     end)
@@ -1403,7 +1399,7 @@ local function buildProfilesPage(page)
     addTooltip(exportEdit, L["Export string for the active profile. Click Select All then Ctrl+C to copy."])
 
     local function refreshExport()
-        local s = BW:ExportProfile()
+        local s = BossW:ExportProfile()
         exportEdit:SetText(s or "")
     end
     refreshExport()
@@ -1459,9 +1455,9 @@ local function buildProfilesPage(page)
             if name == "" then return end
 
             local function doImport(overwrite)
-                local ok, err = BW:ImportProfile(text, name, overwrite)
+                local ok, err = BossW:ImportProfile(text, name, overwrite)
                 if ok then
-                    BW:SetActiveProfile(name)
+                    BossW:SetActiveProfile(name)
                     profileDropdownRefresh()
                     if panel and panel.refreshAll then panel.refreshAll() end
                     print("|cffeda55fBossWatch:|r " .. format(L["profile '%s' imported"], name))
@@ -1471,9 +1467,9 @@ local function buildProfilesPage(page)
             end
 
             -- First try without overwrite; if name exists, prompt to overwrite.
-            local ok, err = BW:ImportProfile(text, name, false)
+            local ok, err = BossW:ImportProfile(text, name, false)
             if ok then
-                BW:SetActiveProfile(name)
+                BossW:SetActiveProfile(name)
                 profileDropdownRefresh()
                 if panel and panel.refreshAll then panel.refreshAll() end
                 print("|cffeda55fBossWatch:|r " .. format(L["profile '%s' imported"], name))
@@ -1588,13 +1584,13 @@ local function buildAboutPage(page)
     cmds:SetPoint("TOPLEFT", cmdHeader, "BOTTOMLEFT", 0, -6)
     cmds:SetWidth(680); cmds:SetJustifyH("LEFT"); cmds:SetSpacing(3)
     cmds:SetText(
-        "|cffffff00/bw|r — " .. L["open options"] .. "\n" ..
-        "|cffffff00/bw config|r |cff888888(" .. L["alias"] .. ")|r — " .. L["open options"] .. "\n" ..
-        "|cffffff00/bw options|r |cff888888(" .. L["alias"] .. ")|r — " .. L["open options"] .. "\n" ..
-        "|cffffff00/bw mover|r — " .. L["toggle mover"] .. "\n" ..
-        "|cffffff00/bw test N|r — " .. L["simulate N bosses (0-5)"] .. "\n" ..
-        "|cffffff00/bw test 0|r — " .. L["stop the simulation"] .. "\n" ..
-        "|cffffff00/bw reset|r — " .. L["reset all settings + reload"]
+        "|cffffff00/bossw|r — " .. L["open options"] .. "\n" ..
+        "|cffffff00/bossw config|r |cff888888(" .. L["alias"] .. ")|r — " .. L["open options"] .. "\n" ..
+        "|cffffff00/bossw options|r |cff888888(" .. L["alias"] .. ")|r — " .. L["open options"] .. "\n" ..
+        "|cffffff00/bossw mover|r — " .. L["toggle mover"] .. "\n" ..
+        "|cffffff00/bossw test N|r — " .. L["simulate N bosses (0-5)"] .. "\n" ..
+        "|cffffff00/bossw test 0|r — " .. L["stop the simulation"] .. "\n" ..
+        "|cffffff00/bossw reset|r — " .. L["reset all settings + reload"]
     )
 
     local hint = page:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
@@ -1607,6 +1603,14 @@ local function buildChangelogPage(page)
 
     -- Per-version blocks. Each entry: { version, date, lines = { ... } }
     local entries = {
+        { ver = "v0.7.0", date = "2026-05-10", lines = {
+            L["Mists of Pandaria Classic support: a single zip now installs on retail and MoP Classic."],
+            L["New slash command: /bossw (with alias /bosswatch). The old /bw is gone — that prefix collides with BigWigs."],
+            L["Bottom tabs now wrap onto a second row when the panel is too narrow, with proper layering so nothing gets clipped."],
+            L["Switching between BossWatch and TankWatch via the side tabs now keeps the window in place — no more jumping to the other addon's saved position."],
+            L["Boss debuffs are detected more reliably on Classic clients (uses the native isBossDebuff flag instead of name-matching)."],
+            L["A yellow banner appears at the top of the panel on Classic builds, flagging that the UI is not yet fully tested in encounters."],
+        }},
         { ver = "v0.6.1", date = "2026-05-10", lines = {
             L["Addon side tabs on the left edge of the panel: switch between BossWatch and TankWatch with one click (the second tab only appears when the sister addon is installed)."],
             L["Modern look on the side tabs: dark glass backdrop, gold accent stripe on the active addon, glow ring on hover."],
@@ -1792,6 +1796,16 @@ local function build()
     searchClear:SetScript("OnClick", function() searchBox:SetText(""); searchBox:ClearFocus() end)
     addTooltip(searchBox, L["Filter the panel: type any keyword from a label or tooltip. Sections without a match are auto-collapsed."])
     addTooltip(searchClear, L["Clear the search."])
+
+    -- Classic build banner — only visible on non-retail clients (MoP Classic etc.).
+    -- The banner sits below the title bar and warns that the UI hasn't been
+    -- fully tested in dungeon/raid encounters yet on this client.
+    if WOW_PROJECT_ID and WOW_PROJECT_MAINLINE and WOW_PROJECT_ID ~= WOW_PROJECT_MAINLINE then
+        local banner = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        banner:SetPoint("TOP", panel, "TOP", 0, -32)
+        banner:SetTextColor(1, 0.82, 0)
+        banner:SetText("|cffffd100" .. L["⚠ Classic build — UI not fully tested in encounters yet, please report bugs."] .. "|r")
+    end
 
     local pageHolder = CreateFrame("Frame", nil, panel)
     pageHolder:SetPoint("TOPLEFT", 8, -60)
@@ -2053,8 +2067,35 @@ local function build()
         end
     end
 
+    -- Wrap tabs into multiple rows when the panel is too narrow to fit them
+    -- all in a single row. Re-runs on resize.
+    local function layoutTabs()
+        local available = panel:GetWidth() - 24  -- 12px margin each side
+        local x, y = 12, 2
+        local rowH = 24
+        local row = 0
+        local baseLevel = panel:GetFrameLevel()
+        for _, tab in ipairs(tabBtns) do
+            local w = tab:GetWidth()
+            if x > 12 and (x + w) > available + 12 then
+                x = 12
+                y = y - rowH
+                row = row + 1
+            end
+            tab:ClearAllPoints()
+            tab:SetPoint("TOPLEFT", panel, "BOTTOMLEFT", x, y)
+            -- Lower rows must draw ABOVE upper rows so their top edges
+            -- (which bridge to the panel border) read clean instead of
+            -- being clipped under the row above.
+            tab:SetFrameLevel(baseLevel + 2 + row * 2)
+            x = x + w + 2
+        end
+    end
+    layoutTabs()
+    panel:HookScript("OnSizeChanged", layoutTabs)
+
     panel.refreshAll = function()
-        local db = BW:GetDB()
+        local db = BossW:GetDB()
         local function walk(f)
             for _, child in ipairs({f:GetChildren()}) do
                 if child.dbKey then
@@ -2094,9 +2135,17 @@ local function build()
                      and TW and TW.ToggleOptions
           end,
           onClick = function()
-              if panel and panel:IsShown() then panel:Hide() end
+              local point, _, relPoint, x, y
+              if panel and panel:IsShown() then
+                  point, _, relPoint, x, y = panel:GetPoint(1)
+                  panel:Hide()
+              end
               local TW = _G.TankWatch
-              if TW and TW.ToggleOptions then TW:ToggleOptions() end
+              if TW and TW.ShowOptionsAt and point then
+                  TW:ShowOptionsAt(point, relPoint, x, y)
+              elseif TW and TW.ToggleOptions then
+                  TW:ToggleOptions()
+              end
           end },
     }
 
@@ -2209,14 +2258,33 @@ local function build()
     end
 end
 
-function BW:ToggleOptions()
+function BossW:ToggleOptions()
     if not panel then build() end
     if panel:IsShown() then panel:Hide()
     else panel.refreshAll(); panel:Show() end
 end
 
-function BW:RegisterBlizzardSettings()
-    if BW._settingsCategoryID or not Settings or not Settings.RegisterCanvasLayoutCategory then
+-- Cross-addon handoff: open the panel at a specific position, used by sister
+-- addons (TankWatch) when switching via side tabs so the window doesn't jump
+-- to its previously-saved spot. Coordinates are persisted, so reopening later
+-- from the minimap / slash command will land in the same place.
+function BossW:ShowOptionsAt(point, relPoint, x, y)
+    if not panel then build() end
+    if point then
+        panel:ClearAllPoints()
+        panel:SetPoint(point, UIParent, relPoint or point, x or 0, y or 0)
+        BossWatchDB.panelPoint = {
+            point = point, relPoint = relPoint or point,
+            x = math.floor((x or 0) + 0.5),
+            y = math.floor((y or 0) + 0.5),
+        }
+    end
+    panel.refreshAll()
+    panel:Show()
+end
+
+function BossW:RegisterBlizzardSettings()
+    if BossW._settingsCategoryID or not Settings or not Settings.RegisterCanvasLayoutCategory then
         return
     end
     local host = CreateFrame("Frame")
@@ -2238,16 +2306,16 @@ function BW:RegisterBlizzardSettings()
     btn:SetText(L["Open BossWatch options"])
     btn:SetScript("OnClick", function()
         if SettingsPanel and SettingsPanel:IsShown() then HideUIPanel(SettingsPanel) end
-        if not panel or not panel:IsShown() then BW:ToggleOptions() end
+        if not panel or not panel:IsShown() then BossW:ToggleOptions() end
     end)
     addTooltip(btn, L["Open the floating BossWatch options panel."])
 
     local hint = host:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
     hint:SetPoint("TOPLEFT", btn, "BOTTOMLEFT", 0, -10)
-    hint:SetText(L["You can also use the slash command: /bw"])
+    hint:SetText(L["You can also use the slash command: /bossw"])
 
     local category = Settings.RegisterCanvasLayoutCategory(host, "BossWatch")
     category.ID = "BossWatch"
     Settings.RegisterAddOnCategory(category)
-    BW._settingsCategoryID = category:GetID()
+    BossW._settingsCategoryID = category:GetID()
 end

@@ -1,8 +1,8 @@
-local addonName, BW = ...
+local addonName, BossW = ...
 
 if GetLocale() ~= "itIT" then return end
 
-local L = BW.L
+local L = BossW.L
 
 -- TABS
 L["Layout"]      = "Layout"
@@ -159,15 +159,15 @@ L["Above icon"]         = "Sopra l'icona"
 L["Custom boss target frames — v%s\nClick the button below to open the BossWatch configuration panel."] =
     "Cornici boss personalizzate — v%s\nClicca il pulsante qui sotto per aprire il pannello di configurazione di BossWatch."
 L["Open BossWatch options"]                = "Apri opzioni BossWatch"
-L["You can also use the slash command: /bw"] = "Puoi anche usare il comando slash: /bw"
+L["You can also use the slash command: /bossw"] = "Puoi anche usare il comando slash: /bossw"
 
 L["commands:"]                  = "comandi:"
 L["open options"]               = "apri opzioni"
 L["toggle mover"]               = "mostra/nascondi mover"
 L["simulate N bosses (0-5)"]    = "simula N boss (0 a 5)"
 L["reset all settings + reload"] = "reimposta tutte le impostazioni e ricarica"
-L["|cffeda55fBossWatch|r v%s loaded — type |cffffff00/bw|r for options"] =
-    "|cffeda55fBossWatch|r v%s caricato — digita |cffffff00/bw|r per le opzioni"
+L["|cffeda55fBossWatch|r v%s loaded — type |cffffff00/bossw|r for options"] =
+    "|cffeda55fBossWatch|r v%s caricato — digita |cffffff00/bossw|r per le opzioni"
 
 L["Custom boss target frames for WoW Retail / Midnight 12.0."] =
     "Cornici boss personalizzate per WoW Retail / Midnight 12.0."

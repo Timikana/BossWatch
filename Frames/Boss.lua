@@ -1,4 +1,4 @@
-local addonName, BW = ...
+local addonName, BossW = ...
 
 local pairs, ipairs, format = pairs, ipairs, string.format
 local CreateFrame = CreateFrame
@@ -119,7 +119,7 @@ local function setNumberText(fontString, value, mode)
     fontString:SetText(formatNumber(value, mode) or "")
 end
 
-local MAX_BOSS = BW.MAX_BOSS
+local MAX_BOSS = BossW.MAX_BOSS
 
 local CLASS_COLORS = RAID_CLASS_COLORS or {}
 
@@ -168,7 +168,7 @@ end
 -- interpolation runs in the bar's own OnUpdate so it auto-stops when the
 -- frame is hidden.
 local function SmoothSetValue(bar, target)
-    local db = BW:GetDB()
+    local db = BossW:GetDB()
     if not db.smoothBars or type(target) ~= "number" then
         bar:SetScript("OnUpdate", nil)
         bar._smoothing = false
@@ -220,7 +220,7 @@ local function SetPowerValue(frame, unit)
     frame.powerBar:SetStatusBarColor(GetPowerColor(unit))
 
     if not frame.powerText then return end
-    local db = BW:GetDB()
+    local db = BossW:GetDB()
     if not db.showPowerText then frame.powerText:SetText(""); return end
 
     local function visualPct()
@@ -311,7 +311,7 @@ end
 local TEST_CLASSES = { "WARRIOR", "MAGE", "WARLOCK", "DEATHKNIGHT", "DEMONHUNTER" }
 
 local function getHighlightColor(frame)
-    local db = BW:GetDB()
+    local db = BossW:GetDB()
     local mode = db.targetHighlightColorMode or "STATIC"
     local fallback = db.targetHighlightColor or { r = 1, g = 0.82, b = 0, a = 1 }
     local a = fallback.a or 1
@@ -351,7 +351,7 @@ end
 local function applyTargetHighlight(frame)
     local hl = frame and frame.targetHighlight
     if not hl then return end
-    local db = BW:GetDB()
+    local db = BossW:GetDB()
     if not db.targetHighlight then
         if hl._anim then hl._anim:Stop() end
         hl:Hide()
@@ -384,11 +384,11 @@ local function applyTargetHighlight(frame)
         hl:Hide()
     end
 end
-BW._applyTargetHighlight = applyTargetHighlight
+BossW._applyTargetHighlight = applyTargetHighlight
 
 local function UpdateFrame(frame)
     local unit = frame.unit
-    local db = BW:GetDB()
+    local db = BossW:GetDB()
 
     -- Visibility driven by RegisterStateDriver — don't Show/Hide here.
 
@@ -534,24 +534,24 @@ local function UpdateFrame(frame)
     end
 
     -- Raid target icon
-    if db.showRaidTargetIcon and BW.UpdateRaidTargetIcon then
-        BW.UpdateRaidTargetIcon(frame)
+    if db.showRaidTargetIcon and BossW.UpdateRaidTargetIcon then
+        BossW.UpdateRaidTargetIcon(frame)
     elseif frame.raidTargetIcon then
         frame.raidTargetIcon:Hide()
     end
 
     -- Auras
-    if BW.UpdateAuras then BW.UpdateAuras(frame) end
+    if BossW.UpdateAuras then BossW.UpdateAuras(frame) end
 
     -- Target highlight border
     applyTargetHighlight(frame)
 end
-BW.UpdateFrame = UpdateFrame
+BossW.UpdateFrame = UpdateFrame
 
 -- ============================================================
 -- RAID TARGET ICON
 -- ============================================================
-function BW.UpdateRaidTargetIcon(frame)
+function BossW.UpdateRaidTargetIcon(frame)
     if not frame.raidTargetIcon then return end
     local unit = frame.unit
     local idx
@@ -589,8 +589,8 @@ local function justifyOf(anchor)
 end
 
 local function ApplyLayout()
-    local db = BW:GetDB()
-    local container = BW.BossContainer
+    local db = BossW:GetDB()
+    local container = BossW.BossContainer
     if not container then return end
 
     if InCombatLockdown() then _pendingLayout = true; return end
@@ -602,11 +602,11 @@ local function ApplyLayout()
     container:ClearAllPoints()
     container:SetPoint(anchor, UIParent, anchor, db.anchorX or 0, db.anchorY or 0)
 
-    local hpTex = BW:ResolveTexture(db.healthTexture)
-    local pwTex = BW:ResolveTexture(db.powerTexture or db.healthTexture)
+    local hpTex = BossW:ResolveTexture(db.healthTexture)
+    local pwTex = BossW:ResolveTexture(db.powerTexture or db.healthTexture)
 
     for i = 1, MAX_BOSS do
-        local f = BW.BossFrames[i]
+        local f = BossW.BossFrames[i]
         if not f then break end
 
         f:SetSize(db.frameWidth, db.frameHeight)
@@ -614,7 +614,7 @@ local function ApplyLayout()
         if i == 1 then
             f:SetPoint("TOP", container, "TOP", 0, 0)
         else
-            local prev = BW.BossFrames[i - 1]
+            local prev = BossW.BossFrames[i - 1]
             local s = db.frameSpacing
             if db.growDirection == "UP" then
                 f:SetPoint("BOTTOM", prev, "TOP", 0, s)
@@ -623,7 +623,7 @@ local function ApplyLayout()
             end
         end
 
-        local bgTex = BW:ResolveTexture(db.barBackgroundTexture or "Solid")
+        local bgTex = BossW:ResolveTexture(db.barBackgroundTexture or "Solid")
         if f.healthBar then
             f.healthBar:SetStatusBarTexture(hpTex)
             if f.healthBar.bg then
@@ -632,7 +632,7 @@ local function ApplyLayout()
             end
         end
         if f.absorbBar then
-            f.absorbBar:SetStatusBarTexture(BW:ResolveTexture(db.absorbTexture or "Blizzard Raid Bar"))
+            f.absorbBar:SetStatusBarTexture(BossW:ResolveTexture(db.absorbTexture or "Blizzard Raid Bar"))
             local c = db.absorbColor or { r = 1, g = 0xEB/0xFF, b = 0x3E/0xFF, a = 0x80/0xFF }
             f.absorbBar:SetStatusBarColor(c.r or 1, c.g or 0xEB/0xFF, c.b or 0x3E/0xFF, c.a or 0x80/0xFF)
         end
@@ -740,33 +740,33 @@ local function ApplyLayout()
             end
         end
 
-        if BW.LayoutCastBar then BW.LayoutCastBar(f, db) end
-        if BW.LayoutAuras then BW.LayoutAuras(f, db) end
-        if BW._updateFrameBg then BW._updateFrameBg(f) end
+        if BossW.LayoutCastBar then BossW.LayoutCastBar(f, db) end
+        if BossW.LayoutAuras then BossW.LayoutAuras(f, db) end
+        if BossW._updateFrameBg then BossW._updateFrameBg(f) end
     end
 
     -- Keep mover overlay in sync with portrait offsets if it's visible
-    if BW.BossContainer and BW.BossContainer._dragOverlay
-       and BW.BossContainer._dragOverlay:IsShown()
-       and BW._updateOverlayBounds then
-        BW._updateOverlayBounds(BW.BossContainer._dragOverlay, BW.BossContainer)
+    if BossW.BossContainer and BossW.BossContainer._dragOverlay
+       and BossW.BossContainer._dragOverlay:IsShown()
+       and BossW._updateOverlayBounds then
+        BossW._updateOverlayBounds(BossW.BossContainer._dragOverlay, BossW.BossContainer)
     end
 end
-BW.ApplyLayout = ApplyLayout
+BossW.ApplyLayout = ApplyLayout
 
 local function RefreshAll()
-    if not BW.BossContainer then return end
+    if not BossW.BossContainer then return end
     ApplyLayout()
-    if BW.ApplyFonts then BW:ApplyFonts() end
+    if BossW.ApplyFonts then BossW:ApplyFonts() end
     for i = 1, MAX_BOSS do
-        local f = BW.BossFrames[i]
+        local f = BossW.BossFrames[i]
         if f then
             UpdateFrame(f)
             if f.applyClickActions then f.applyClickActions() end
         end
     end
 end
-BW.RefreshAll = RefreshAll
+BossW.RefreshAll = RefreshAll
 
 -- ============================================================
 -- FRAME CREATION
@@ -775,7 +775,7 @@ local function CreateBossFrame(index)
     local name = "BossWatchFrame" .. index
     local unit = "boss" .. index
 
-    local f = CreateFrame("Button", name, BW.BossContainer, "SecureUnitButtonTemplate")
+    local f = CreateFrame("Button", name, BossW.BossContainer, "SecureUnitButtonTemplate")
     f:SetAttribute("unit", unit)
     f:SetAttribute("*type1", "target")
     f:SetAttribute("*type2", "togglemenu")
@@ -788,7 +788,7 @@ local function CreateBossFrame(index)
     -- on InCombatLockdown, queued via _pendingLayout if needed).
     f.applyClickActions = function()
         if InCombatLockdown() then return false end
-        local db = BW:GetDB()
+        local db = BossW:GetDB()
         if db.clickActions ~= false then
             f:SetAttribute("shift-type1", "macro")
             f:SetAttribute("shift-macrotext1",
@@ -918,7 +918,7 @@ local function CreateBossFrame(index)
     f:RegisterEvent("RAID_TARGET_UPDATE")
     f:RegisterUnitEvent("UNIT_HEALTH", unit)
     f:SetScript("OnEvent", function(self, event, eUnit)
-        if event == "RAID_TARGET_UPDATE" then BW.UpdateRaidTargetIcon(self); return end
+        if event == "RAID_TARGET_UPDATE" then BossW.UpdateRaidTargetIcon(self); return end
         if event == "UNIT_TARGETABLE_CHANGED" and eUnit == unit then UpdateFrame(self); return end
         if eUnit ~= unit then return end
         UpdateFrame(self)
@@ -930,9 +930,9 @@ end
 -- ============================================================
 -- INIT
 -- ============================================================
-function BW:EnsureCreated()
-    if BW.BossContainer then return end
-    local db = BW:GetDB()
+function BossW:EnsureCreated()
+    if BossW.BossContainer then return end
+    local db = BossW:GetDB()
     if not db.enabled then return end
 
     local container = CreateFrame("Frame", "BossWatchContainer", UIParent)
@@ -941,11 +941,11 @@ function BW:EnsureCreated()
     container:SetFrameStrata(db.frameStrata or "MEDIUM")
     container:SetMovable(true)
     container:SetClampedToScreen(true)
-    BW.BossContainer = container
+    BossW.BossContainer = container
 
-    for i = 1, MAX_BOSS do BW.BossFrames[i] = CreateBossFrame(i) end
+    for i = 1, MAX_BOSS do BossW.BossFrames[i] = CreateBossFrame(i) end
     ApplyLayout()
-    if db.hideBlizzard then BW:HideBlizzardBossFrames() end
+    if db.hideBlizzard then BossW:HideBlizzardBossFrames() end
 end
 
 -- ============================================================
@@ -954,9 +954,9 @@ end
 -- Anchors the frame-level bg statically based on db.frameBgWrapsCast.
 -- When false, the bg stops above the cast zone so an idle cast bar shows
 -- through transparent — when true, bg covers the whole frame.
-function BW._updateFrameBg(frame)
+function BossW._updateFrameBg(frame)
     if not frame or not frame.bg or not frame.powerBar or not frame.healthBar then return end
-    local db = BW:GetDB()
+    local db = BossW:GetDB()
     frame.bg:ClearAllPoints()
     frame.bg:SetPoint("TOPLEFT",  frame, "TOPLEFT",  0, 0)
     frame.bg:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 0, 0)
@@ -975,7 +975,7 @@ function BW._updateFrameBg(frame)
 end
 
 local function updateOverlayBounds(o, c)
-    local db = BW:GetDB()
+    local db = BossW:GetDB()
     local pSize = (db.portraitPosition and db.portraitPosition ~= "HIDDEN") and (db.portraitSize or 0) or 0
     local leftOff  = (db.portraitPosition == "LEFT")  and (pSize + 2) or 0
     local rightOff = (db.portraitPosition == "RIGHT") and (pSize + 2) or 0
@@ -983,10 +983,10 @@ local function updateOverlayBounds(o, c)
     o:SetPoint("TOPLEFT",     c, "TOPLEFT",     -leftOff, 0)
     o:SetPoint("BOTTOMRIGHT", c, "BOTTOMRIGHT", rightOff, 0)
 end
-BW._updateOverlayBounds = updateOverlayBounds
+BossW._updateOverlayBounds = updateOverlayBounds
 
 local function ensureDragOverlay()
-    local c = BW.BossContainer
+    local c = BossW.BossContainer
     if c._dragOverlay then return c._dragOverlay end
     local o = CreateFrame("Button", nil, c)
     o:SetFrameStrata("DIALOG")
@@ -1004,7 +1004,7 @@ local function ensureDragOverlay()
     o:SetScript("OnDragStart", function() c:StartMoving() end)
     o:SetScript("OnDragStop", function()
         c:StopMovingOrSizing()
-        local db = BW:GetDB()
+        local db = BossW:GetDB()
         local point, _, _, x, y = c:GetPoint()
         db.anchor = point
         db.anchorX = x
@@ -1013,26 +1013,26 @@ local function ensureDragOverlay()
         c:SetPoint(point, UIParent, point, x, y)
     end)
     o:SetScript("OnClick", function(self, btn)
-        if btn == "RightButton" then BW:ToggleMover() end
+        if btn == "RightButton" then BossW:ToggleMover() end
     end)
     o:Hide()
     c._dragOverlay = o
     return o
 end
 
-function BW:ToggleMover()
-    BW:EnsureCreated()
-    local c = BW.BossContainer
+function BossW:ToggleMover()
+    BossW:EnsureCreated()
+    local c = BossW.BossContainer
     if not c then return end
     local anyVisible = false
     for i = 1, MAX_BOSS do
-        if BW.BossFrames[i] and BW.BossFrames[i]:IsShown() then anyVisible = true; break end
+        if BossW.BossFrames[i] and BossW.BossFrames[i]:IsShown() then anyVisible = true; break end
     end
     local overlay = ensureDragOverlay()
     if c._movingEnabled then
         overlay:Hide()
         c._movingEnabled = false
-        if c._autoTest then c._autoTest = false; BW:SetTestMode(0) end
+        if c._autoTest then c._autoTest = false; BossW:SetTestMode(0) end
         print("|cffeda55fBossWatch:|r mover locked")
     else
         c:SetMovable(true)
@@ -1040,7 +1040,7 @@ function BW:ToggleMover()
         overlay:Show()
         c._movingEnabled = true
         if not anyVisible then
-            BW:SetTestMode(3)
+            BossW:SetTestMode(3)
             c._autoTest = true
         end
         print("|cffeda55fBossWatch:|r mover unlocked — left-drag to move, right-click to lock")
@@ -1063,7 +1063,7 @@ testTicker:SetScript("OnUpdate", function(self, e)
     local active
     local activeIndices = {}
     for i = 1, MAX_BOSS do
-        local f = BW.BossFrames[i]
+        local f = BossW.BossFrames[i]
         if f and f._testMode then
             active = true
             activeIndices[#activeIndices + 1] = i
@@ -1078,7 +1078,7 @@ testTicker:SetScript("OnUpdate", function(self, e)
             if f._testAbsorb <= 5 then f._testAbsorbDir = 1
             elseif f._testAbsorb >= 45 then f._testAbsorbDir = -1 end
             if not _testNextCast[i] or now >= _testNextCast[i] then
-                if BW.SimulateCast then BW.SimulateCast(f, math.random() < 0.25) end
+                if BossW.SimulateCast then BossW.SimulateCast(f, math.random() < 0.25) end
                 _testNextCast[i] = now + 3 + math.random() * 4
             end
             UpdateFrame(f)
@@ -1088,13 +1088,13 @@ testTicker:SetScript("OnUpdate", function(self, e)
     if active and now >= _testNextTargetSwap then
         local pick = activeIndices[math.random(1, #activeIndices)]
         for i = 1, MAX_BOSS do
-            local f = BW.BossFrames[i]
+            local f = BossW.BossFrames[i]
             if f then f._fakeTarget = (i == pick) end
         end
-        if BW._applyTargetHighlight then
+        if BossW._applyTargetHighlight then
             for i = 1, MAX_BOSS do
-                local f = BW.BossFrames[i]
-                if f then BW._applyTargetHighlight(f) end
+                local f = BossW.BossFrames[i]
+                if f then BossW._applyTargetHighlight(f) end
             end
         end
         _testNextTargetSwap = now + 3
@@ -1103,8 +1103,8 @@ testTicker:SetScript("OnUpdate", function(self, e)
 end)
 
 local _lastTestCount
-function BW:SetTestMode(count)
-    BW:EnsureCreated()
+function BossW:SetTestMode(count)
+    BossW:EnsureCreated()
     count = tonumber(count) or 0
     if count < 0 then count = 0 end
     if count > MAX_BOSS then count = MAX_BOSS end
@@ -1115,7 +1115,7 @@ function BW:SetTestMode(count)
     local testHp = { 95, 72, 48, 30, 12 }
 
     for i = 1, MAX_BOSS do
-        local f = BW.BossFrames[i]
+        local f = BossW.BossFrames[i]
         if f then
             if i <= count then
                 f._testMode = true
@@ -1143,7 +1143,7 @@ function BW:SetTestMode(count)
     end
 
     -- Trigger ApplyLayout so absorbBar width / textures are refreshed.
-    BW:RefreshAll()
+    BossW:RefreshAll()
 
     if count > 0 then
         testTicker:Show()
@@ -1167,18 +1167,18 @@ eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
 eventFrame:RegisterEvent("PLAYER_TARGET_CHANGED")
 eventFrame:SetScript("OnEvent", function(_, event)
     if event == "PLAYER_TARGET_CHANGED" then
-        for i = 1, BW.MAX_BOSS do
-            local f = BW.BossFrames[i]
+        for i = 1, BossW.MAX_BOSS do
+            local f = BossW.BossFrames[i]
             if f then applyTargetHighlight(f) end
         end
         return
     end
     if event == "PLAYER_REGEN_ENABLED" and _pendingLayout then
         _pendingLayout = false
-        BW:EnsureCreated()
+        BossW:EnsureCreated()
         RefreshAll()
         return
     end
-    BW:EnsureCreated()
+    BossW:EnsureCreated()
     RefreshAll()
 end)

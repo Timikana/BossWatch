@@ -1,9 +1,9 @@
-local addonName, BW = ...
+local addonName, BossW = ...
 
 local CreateFrame = CreateFrame
 local GetTime = GetTime
 local format = string.format
-local MAX_BOSS = BW.MAX_BOSS
+local MAX_BOSS = BossW.MAX_BOSS
 
 local function CreateAuraButton(parent, index)
     local b = CreateFrame("Frame", nil, parent)
@@ -108,12 +108,17 @@ local function collectAuras(unit, filter, source, maxCount)
         end
     else
         for i = 1, 40 do
-            local name, icon, count, _, duration, expiration, caster = UnitAura(unit, i, filter)
+            -- Position 12 (isBossDebuff) is available since MoP. Populating
+            -- data.isBossAura makes the BOSS_ONLY filter exact instead of
+            -- falling back to the fragile sourceUnit:match("^boss") test.
+            local name, icon, count, _, duration, expiration, caster,
+                  _, _, _, _, isBossDebuff = UnitAura(unit, i, filter)
             if not name then break end
             local data = {
                 name = name, icon = icon, applications = count or 0,
                 duration = duration or 0, expirationTime = expiration or 0,
                 sourceUnit = caster,
+                isBossAura = isBossDebuff or false,
             }
             if auraMatchesSource(data, source) then
                 auraBuffer[#auraBuffer + 1] = data
@@ -127,7 +132,7 @@ end
 -- ============================================================
 -- LAYOUT + UPDATE
 -- ============================================================
-function BW.LayoutAuras(frame, db)
+function BossW.LayoutAuras(frame, db)
     if not db.showAuras then
         if frame._auras then for _, b in ipairs(frame._auras) do b:Hide() end end
         return
@@ -170,8 +175,8 @@ function BW.LayoutAuras(frame, db)
     end
 end
 
-function BW.UpdateAuras(frame)
-    local db = BW:GetDB()
+function BossW.UpdateAuras(frame)
+    local db = BossW:GetDB()
     if not db.showAuras or not frame._auras then
         if frame._auras then for _, b in ipairs(frame._auras) do b:Hide() end end
         return
@@ -257,6 +262,6 @@ eventFrame:RegisterEvent("UNIT_AURA")
 eventFrame:SetScript("OnEvent", function(_, event, unit)
     if not unit or not unit:match("^boss%d$") then return end
     local idx = tonumber(unit:sub(5))
-    local frame = BW.BossFrames and BW.BossFrames[idx]
-    if frame then BW.UpdateAuras(frame) end
+    local frame = BossW.BossFrames and BossW.BossFrames[idx]
+    if frame then BossW.UpdateAuras(frame) end
 end)

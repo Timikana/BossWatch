@@ -1,4 +1,4 @@
-local addonName, BW = ...
+local addonName, BossW = ...
 
 local CreateFrame = CreateFrame
 local GetTime = GetTime
@@ -6,7 +6,7 @@ local UnitCastingInfo = UnitCastingInfo
 local UnitChannelInfo = UnitChannelInfo
 local issecretvalue = _G.issecretvalue or function() return false end
 
-local MAX_BOSS = BW.MAX_BOSS
+local MAX_BOSS = BossW.MAX_BOSS
 
 local function CreateCastBar(frame)
     if frame.castBar then return frame.castBar end
@@ -49,7 +49,7 @@ local function CreateCastBar(frame)
     return cb
 end
 
-function BW.LayoutCastBar(frame, db)
+function BossW.LayoutCastBar(frame, db)
     if not db.showCastBar then
         if frame.castBar then frame.castBar:Hide() end
         return
@@ -57,9 +57,9 @@ function BW.LayoutCastBar(frame, db)
 
     local cb = CreateCastBar(frame)
     cb:ClearAllPoints()
-    cb:SetStatusBarTexture(BW:ResolveTexture(db.castTexture or db.healthTexture))
+    cb:SetStatusBarTexture(BossW:ResolveTexture(db.castTexture or db.healthTexture))
     if cb.bg then
-        cb.bg:SetTexture(BW:ResolveTexture(db.barBackgroundTexture or "Solid"))
+        cb.bg:SetTexture(BossW:ResolveTexture(db.barBackgroundTexture or "Solid"))
         cb.bg:SetVertexColor(0, 0, 0, db.castBackgroundAlpha or 0.7)
     end
 
@@ -159,7 +159,7 @@ local tickerFrame = CreateFrame("Frame")
 tickerFrame:SetScript("OnUpdate", function()
     local now = GetTime()
     for i = 1, MAX_BOSS do
-        local f = BW.BossFrames and BW.BossFrames[i]
+        local f = BossW.BossFrames and BossW.BossFrames[i]
         local cb = f and f.castBar
         if cb and cb:IsShown() then
             if cb._fadeOut then
@@ -199,7 +199,7 @@ eventFrame:RegisterEvent("UNIT_SPELLCAST_NOT_INTERRUPTIBLE")
 eventFrame:SetScript("OnEvent", function(_, event, unit)
     if not unit or not unit:match("^boss%d$") then return end
     local idx = tonumber(unit:sub(5))
-    local frame = BW.BossFrames and BW.BossFrames[idx]
+    local frame = BossW.BossFrames and BossW.BossFrames[idx]
     if not frame then return end
 
     if event == "UNIT_SPELLCAST_START" then StartCast(frame, false)
@@ -230,9 +230,9 @@ local SIMULATED_SPELLS = {
     { name = "Lightning Bolt", texture = 136048, duration = 1.8 },
 }
 
-function BW.SimulateCast(frame, channeling)
+function BossW.SimulateCast(frame, channeling)
     local cb = CreateCastBar(frame)
-    local db = BW:GetDB()
+    local db = BossW:GetDB()
     if not db.showCastBar then return end
     local spell = SIMULATED_SPELLS[math.random(#SIMULATED_SPELLS)]
     local now = GetTime()
