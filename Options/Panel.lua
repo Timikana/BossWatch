@@ -2077,7 +2077,7 @@ local function build()
     -- and stays selected; sister addons (TankWatch) appear below it ONLY if
     -- the addon is loaded. Click a sister tab → close this panel + open theirs.
     -- =====================================================================
-    local SIDE_TAB_SIZE = 44
+    local SIDE_TAB_SIZE = 48
     local sideTabs = {
         { id = "BossWatch",  isSelf = true,  icon = "Interface\\AddOns\\BossWatch\\Media\\logo.png",
           tooltip = L["BossWatch — Options"], onClick = function() end },
@@ -2103,63 +2103,98 @@ local function build()
 
             local tab = CreateFrame("Button", nil, panel, "BackdropTemplate")
             tab:SetSize(SIDE_TAB_SIZE, SIDE_TAB_SIZE)
-            tab:SetPoint("TOPLEFT", panel, "TOPLEFT", -SIDE_TAB_SIZE + 6,
-                         -64 - (visibleIdx - 1) * (SIDE_TAB_SIZE + 6))
+            tab:SetPoint("TOPLEFT", panel, "TOPLEFT", -SIDE_TAB_SIZE + 8,
+                         -68 - (visibleIdx - 1) * (SIDE_TAB_SIZE + 8))
             tab:SetFrameLevel(panel:GetFrameLevel() + 5)
 
-            -- Modern dark backdrop with thin border (like 11.0 Settings panels)
-            tab:SetBackdrop({
-                bgFile   = "Interface\\Buttons\\WHITE8x8",
-                edgeFile = "Interface\\Buttons\\WHITE8x8",
-                edgeSize = 1,
-            })
-            tab:SetBackdropColor(0.04, 0.04, 0.06, 0.95)
-            tab:SetBackdropBorderColor(0.30, 0.30, 0.36, 1)
+            -- Dark vignette backdrop — no edge, we draw our own borders
+            tab:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8x8" })
+            tab:SetBackdropColor(0.04, 0.04, 0.07, 0.95)
 
-            -- Top-edge highlight (subtle "shine" line at the top of the tab)
+            -- Soft inner highlight at the top (vertical gradient)
             local sheen = tab:CreateTexture(nil, "ARTWORK")
-            sheen:SetPoint("TOPLEFT",  tab, "TOPLEFT",   1,  -1)
-            sheen:SetPoint("TOPRIGHT", tab, "TOPRIGHT", -1,  -1)
-            sheen:SetHeight(2)
-            sheen:SetColorTexture(1, 1, 1, 0.10)
+            sheen:SetPoint("TOPLEFT",     tab, "TOPLEFT",      1, -1)
+            sheen:SetPoint("BOTTOMRIGHT", tab, "TOPRIGHT",    -1, -math.floor(SIDE_TAB_SIZE * 0.45))
+            sheen:SetColorTexture(1, 1, 1, 1)
+            if sheen.SetGradient and CreateColor then
+                sheen:SetGradient("VERTICAL",
+                    CreateColor(1, 1, 1, 0.10),
+                    CreateColor(1, 1, 1, 0.00))
+            else
+                sheen:SetVertexColor(1, 1, 1, 0.06)
+            end
 
-            -- Icon (slightly inset)
-            local icon = tab:CreateTexture(nil, "ARTWORK", nil, 1)
-            icon:SetPoint("TOPLEFT",     tab, "TOPLEFT",      4, -4)
-            icon:SetPoint("BOTTOMRIGHT", tab, "BOTTOMRIGHT", -4,  4)
+            -- Bottom subtle shadow
+            local shade = tab:CreateTexture(nil, "ARTWORK")
+            shade:SetPoint("BOTTOMLEFT",  tab, "BOTTOMLEFT",   1,  1)
+            shade:SetPoint("BOTTOMRIGHT", tab, "BOTTOMRIGHT", -1,  1)
+            shade:SetHeight(math.floor(SIDE_TAB_SIZE * 0.40))
+            shade:SetColorTexture(0, 0, 0, 1)
+            if shade.SetGradient and CreateColor then
+                shade:SetGradient("VERTICAL",
+                    CreateColor(0, 0, 0, 0.00),
+                    CreateColor(0, 0, 0, 0.45))
+            else
+                shade:SetVertexColor(0, 0, 0, 0.20)
+            end
+
+            -- Icon — round-ish, generously inset, with a tex-coord crop
+            -- so logo edges don't touch the border
+            local icon = tab:CreateTexture(nil, "ARTWORK", nil, 2)
+            icon:SetPoint("CENTER", tab, "CENTER", 0, 0)
+            icon:SetSize(SIDE_TAB_SIZE - 14, SIDE_TAB_SIZE - 14)
             icon:SetTexture(def.icon)
-            icon:SetTexCoord(0.04, 0.96, 0.04, 0.96)
+            icon:SetTexCoord(0.06, 0.94, 0.06, 0.94)
 
-            -- Outer glow for selected / hover (additive yellow)
+            -- Hand-drawn border (4 thin lines), gold when active
+            local function makeEdge(point1, point2, w, h)
+                local t = tab:CreateTexture(nil, "BORDER")
+                t:SetPoint(point1, tab, point1, 0, 0)
+                t:SetPoint(point2, tab, point2, 0, 0)
+                if w then t:SetWidth(w) end
+                if h then t:SetHeight(h) end
+                return t
+            end
+            local edges = {
+                makeEdge("TOPLEFT", "TOPRIGHT", nil, 1),
+                makeEdge("BOTTOMLEFT", "BOTTOMRIGHT", nil, 1),
+                makeEdge("TOPLEFT", "BOTTOMLEFT", 1, nil),
+                makeEdge("TOPRIGHT", "BOTTOMRIGHT", 1, nil),
+            }
+            local function setEdgeColor(r, g, b, a)
+                for _, t in ipairs(edges) do t:SetColorTexture(r, g, b, a) end
+            end
+            setEdgeColor(0.20, 0.20, 0.24, 1)
+
+            -- Outer glow ring (additive gold), shown when active or hovered
             local glow = tab:CreateTexture(nil, "OVERLAY")
-            glow:SetPoint("TOPLEFT",     tab, "TOPLEFT",     -6,  6)
-            glow:SetPoint("BOTTOMRIGHT", tab, "BOTTOMRIGHT",  6, -6)
+            glow:SetPoint("TOPLEFT",     tab, "TOPLEFT",     -10,  10)
+            glow:SetPoint("BOTTOMRIGHT", tab, "BOTTOMRIGHT",  10, -10)
             glow:SetTexture("Interface\\Buttons\\UI-ActionButton-Border")
             glow:SetBlendMode("ADD")
-            glow:SetVertexColor(1, 0.82, 0, 0.95)
+            glow:SetVertexColor(1, 0.82, 0, 0.85)
             glow:Hide()
 
-            -- Selected mark: a thin gold bar along the LEFT edge (the side
-            -- closer to the panel body) — same idiom as the modern Settings list.
-            local marker = tab:CreateTexture(nil, "OVERLAY")
-            marker:SetPoint("TOPRIGHT",    tab, "TOPRIGHT",    -1, -2)
-            marker:SetPoint("BOTTOMRIGHT", tab, "BOTTOMRIGHT", -1,  2)
-            marker:SetWidth(2)
+            -- Selected accent: a thicker, brighter stripe along the panel-side edge
+            local marker = tab:CreateTexture(nil, "OVERLAY", nil, 1)
+            marker:SetPoint("TOPRIGHT",    tab, "TOPRIGHT",    -0.5, -3)
+            marker:SetPoint("BOTTOMRIGHT", tab, "BOTTOMRIGHT", -0.5,  3)
+            marker:SetWidth(3)
             marker:SetColorTexture(1, 0.82, 0, 1)
             marker:Hide()
 
             if def.isSelf then
-                tab:SetBackdropBorderColor(1, 0.82, 0, 1)
+                setEdgeColor(1, 0.82, 0, 1)
                 glow:Show()
                 marker:Show()
                 tab:EnableMouse(false)
             else
-                tab:HookScript("OnEnter", function(self)
-                    self:SetBackdropBorderColor(1, 0.82, 0, 1)
+                tab:HookScript("OnEnter", function()
+                    setEdgeColor(1, 0.82, 0, 1)
                     glow:Show()
                 end)
-                tab:HookScript("OnLeave", function(self)
-                    self:SetBackdropBorderColor(0.30, 0.30, 0.36, 1)
+                tab:HookScript("OnLeave", function()
+                    setEdgeColor(0.20, 0.20, 0.24, 1)
                     glow:Hide()
                 end)
                 tab:SetScript("OnClick", def.onClick)
