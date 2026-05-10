@@ -928,6 +928,10 @@ local function buildLayoutPage(page)
     addTooltip(cbMini, L["Show a minimap button to open the options. Left-click: options, right-click: toggle mover."])
     _registerInSection(cbMini)
 
+    y = y - 30
+    addTooltip(markAsNew(makeCheck(page, L["Click actions on boss frames"], "clickActions", 14, y), "clickActions"),
+        L["Enable modifier+click shortcuts on boss frames: Shift+Click cycles a raid marker, Ctrl+Click sets focus."])
+
     -- ============ LAYOUT STYLE ============
     y = y - 60
     makeSection(page, L["Layout style"], 14, y, "layout.style"); y = y - 24
@@ -1015,6 +1019,8 @@ local function buildBarsPage(page)
     y = y - 56
     addTooltip(makeSlider(page, L["HP background alpha"], "healthBackgroundAlpha", 0, 1, 0.05, 14, y),
         L["Opacity of the empty (un-filled) part of the health bar."])
+    addTooltip(markAsNew(makeCheck(page, L["Smooth bar animation"], "smoothBars", 260, y), "smoothBars"),
+        L["Animate the health bar between values instead of jumping. Disable for instant updates."])
 
     -- ============ POWER ============
     y = y - 60

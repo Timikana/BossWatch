@@ -385,6 +385,10 @@ L["Search options…"]                                                          
 L["Filter the panel: type any keyword from a label or tooltip. Sections without a match are auto-collapsed."] = "Filtrer le panneau : tape un mot-clé d'un libellé ou d'une astuce. Les sections sans correspondance se replient automatiquement."
 L["Clear the search."]                                                               = "Effacer la recherche."
 L["No options match your search."]                                                   = "Aucune option ne correspond à ta recherche."
+L["Smooth bar animation"]                                                            = "Animation fluide des barres"
+L["Animate the health bar between values instead of jumping. Disable for instant updates."] = "Anime la barre de vie entre les valeurs au lieu de sauter. Désactive pour des mises à jour instantanées."
+L["Click actions on boss frames"]                                                    = "Actions au clic sur les cadres de boss"
+L["Enable modifier+click shortcuts on boss frames: Shift+Click cycles a raid marker, Ctrl+Click sets focus."] = "Active les raccourcis modificateur+clic : Maj+Clic fait tourner les marqueurs de raid, Ctrl+Clic met en focus."
 
 -- ============================================================
 -- SECTION HEADERS (UI reorg)
