@@ -96,6 +96,7 @@ BossW.Defaults = {
     aurasGrowX = "LEFT", aurasGrowY = "DOWN",
     aurasShowStacks = true, aurasStackAnchor = "BOTTOMRIGHT", aurasStackX = 0, aurasStackY = 0,
     aurasShowTimer = true, aurasTimerPlacement = "BELOW", aurasTimerX = 0, aurasTimerY = 0,
+    aurasTooltip = true,
 }
 
 -- ============================================================

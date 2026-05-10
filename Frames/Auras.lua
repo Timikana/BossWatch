@@ -8,6 +8,34 @@ local MAX_BOSS = BossW.MAX_BOSS
 local function CreateAuraButton(parent, index)
     local b = CreateFrame("Frame", nil, parent)
     b:SetSize(24, 24); b:Hide()
+    b:EnableMouse(true)
+    b:SetScript("OnEnter", function(self)
+        local db = BossW:GetDB()
+        if not db.aurasTooltip then return end
+        if not self._unit then return end
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        local filter = db.aurasFilter or "HARMFUL"
+        local shown = false
+        -- Modern path: instance-ID-based tooltip (10.0+).
+        if self._auraInstanceID then
+            if filter == "HARMFUL" and GameTooltip.SetUnitDebuffByAuraInstanceID then
+                shown = pcall(GameTooltip.SetUnitDebuffByAuraInstanceID, GameTooltip, self._unit, self._auraInstanceID)
+            elseif filter == "HELPFUL" and GameTooltip.SetUnitBuffByAuraInstanceID then
+                shown = pcall(GameTooltip.SetUnitBuffByAuraInstanceID, GameTooltip, self._unit, self._auraInstanceID)
+            end
+        end
+        -- Legacy fallback: index-based (Classic + when modern API is missing).
+        if not shown and self._auraIndex then
+            shown = pcall(GameTooltip.SetUnitAura, GameTooltip, self._unit, self._auraIndex, filter)
+        end
+        if not shown then
+            -- Last-resort: secret-tagged auras may refuse to populate the tooltip.
+            -- Show a minimal placeholder so the user still gets feedback.
+            GameTooltip:SetText(self._auraName or "")
+        end
+        GameTooltip:Show()
+    end)
+    b:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
     local icon = b:CreateTexture(nil, "ARTWORK")
     icon:SetAllPoints(b)
@@ -101,6 +129,7 @@ local function collectAuras(unit, filter, source, maxCount)
         for i = 1, 40 do
             local data = C_UnitAuras.GetAuraDataByIndex(unit, i, filter)
             if not data then break end
+            data._auraIndex = i  -- preserved for tooltip fallback
             if auraMatchesSource(data, source) then
                 auraBuffer[#auraBuffer + 1] = data
                 if #auraBuffer >= maxCount then break end
@@ -119,6 +148,7 @@ local function collectAuras(unit, filter, source, maxCount)
                 duration = duration or 0, expirationTime = expiration or 0,
                 sourceUnit = caster,
                 isBossAura = isBossDebuff or false,
+                _auraIndex = i,  -- preserved for tooltip
             }
             if auraMatchesSource(data, source) then
                 auraBuffer[#auraBuffer + 1] = data
@@ -202,6 +232,10 @@ function BossW.UpdateAuras(frame)
             local b = frame._auras[i]
             local a = frame._testAuras[i]
             if a then
+                -- No real unit aura in test mode — wipe refs so OnEnter
+                -- shows just the test aura name as a placeholder.
+                b._unit = nil; b._auraInstanceID = nil; b._auraIndex = nil
+                b._auraName = "Test Aura"
                 b.icon:SetTexture(a.icon)
                 local elapsed = a.duration - (a.expirationTime - now)
                 local stacks = math.floor(1 + elapsed * (a.stackGrowSpeed or 0))
@@ -229,6 +263,12 @@ function BossW.UpdateAuras(frame)
         local b = frame._auras[i]
         local a = auras[i]
         if a then
+            -- Tooltip metadata: instance ID for modern API, index for legacy
+            -- fallback, name as last-resort string when both fail.
+            b._unit = unit
+            b._auraInstanceID = a.auraInstanceID
+            b._auraIndex = a._auraIndex
+            b._auraName = a.name
             b.icon:SetTexture(a.icon)
             if db.aurasShowStacks then
                 local ok, showIt = pcall(function() return a.applications and a.applications > 1 end)
