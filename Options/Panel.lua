@@ -1607,6 +1607,16 @@ local function buildChangelogPage(page)
 
     -- Per-version blocks. Each entry: { version, date, lines = { ... } }
     local entries = {
+        { ver = "v0.6.0", date = "2026-05-10", lines = {
+            L["Search bar (top-right) gathers matches from every tab onto a single Results page — Blizzard-style. Tabs show a (N) badge per hit count."],
+            L["Collapsible sections with a refresh icon to reset just that section to defaults."],
+            L["Resizable options window: drag the bottom-right grip; size and position saved account-wide. New 'Reset window size' button in About."],
+            L["Auto-flow: right-column controls (sliders, checks, dropdowns, color pickers) slide along the right edge when the panel is widened."],
+            L["Click actions on boss frames: Shift+Click cycles raid markers, Ctrl+Click sets focus. Toggle in Layout > General."],
+            L["Smooth health bar animation (toggle in Bars > Health)."],
+            L["This Changelog tab so you can see what changed without leaving the game."],
+            L["Lots of small UX polish: section dividers stretch with the panel width, dropdown labels stay anchored above their control, more tooltips, etc."],
+        }},
         { ver = "v0.5.1", date = "2026-05-10", lines = {
             L["Compatibility with WoW patch 12.0.7 (no more out-of-date warning)."],
         }},
