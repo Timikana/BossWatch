@@ -11,8 +11,54 @@ local refresh = function() if BW.RefreshAll then BW:RefreshAll() end end
 -- currently-being-built section. Each makeSection() updates this; each
 -- makeXxx() factory pushes itself onto _currentSection.children/dbKeys.
 local _currentSection = nil
+-- Chain of last-built section per page so makeSection() anchors its container
+-- under the previous section, which lets collapsing one section pull the rest
+-- of the page up.
+local _lastSectionOnPage = {}
+local _allSectionsOnPage = {}  -- [page] = { section1, section2, ... } in order
+
+local function _refreshHeightsForPage(parent)
+    local list = _allSectionsOnPage[parent]
+    if not list then return end
+    for _, s in ipairs(list) do
+        if not s._collapsed then s:UpdateNaturalHeight() end
+    end
+end
+
+local function _captureAndReparent(widget, container, sectionOriginY)
+    -- Reparent the widget to the section container so it inherits visibility
+    -- (we still call Hide() on collapse for click-through reasons).
+    -- Convert page-relative anchors to container-relative so when the container
+    -- moves up after a previous section is collapsed, the widget moves with it.
+    if not widget or not widget.GetPoint or not widget.SetPoint or not widget.SetParent then return end
+    local nPoints = widget.GetNumPoints and widget:GetNumPoints() or 0
+    if nPoints == 0 then return end
+    local pageRoot = container:GetParent()
+    -- Capture all points first (SetParent + ClearAllPoints will drop them)
+    local saved = {}
+    for i = 1, nPoints do
+        local p, relTo, relPoint, x, y = widget:GetPoint(i)
+        saved[i] = { p = p, relTo = relTo, relPoint = relPoint, x = x or 0, y = y or 0 }
+    end
+    widget:SetParent(container)
+    widget:ClearAllPoints()
+    for _, a in ipairs(saved) do
+        if a.relTo == pageRoot or a.relTo == nil then
+            -- Was page-relative: rebase onto the container at the same x, y shifted
+            -- by the section's own y offset on the page.
+            widget:SetPoint(a.p, container, a.relPoint, a.x, a.y - sectionOriginY)
+        else
+            -- Was relative to another widget (typically labelFS for a dropdown);
+            -- that other widget is also reparented + re-anchored to the container,
+            -- so the chain still resolves correctly. Keep as-is.
+            widget:SetPoint(a.p, a.relTo, a.relPoint, a.x, a.y)
+        end
+    end
+end
+
 local function _registerInSection(widget, dbKey)
     if _currentSection and widget then
+        _captureAndReparent(widget, _currentSection.container, _currentSection._originalY)
         _currentSection.children[#_currentSection.children + 1] = widget
         if dbKey then _currentSection.dbKeys[#_currentSection.dbKeys + 1] = dbKey end
     end
@@ -505,67 +551,110 @@ local function _cloneDefault(v)
     return out
 end
 
+local SECTION_GAP = 28  -- vertical pixels between section containers
+local COLLAPSED_HEIGHT = 22
+
 local function makeSection(parent, title, x, y, key)
     local section = {
         children = {},
         dbKeys = {},
         key = key,
+        _originalY = y,
+        _parent = parent,
     }
 
-    local header = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    header:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y)
+    -- Container frame: chains under the previous section on this page.
+    -- Collapsing one container shrinks it, which automatically pulls every
+    -- subsequent section up the page.
+    local container = CreateFrame("Frame", nil, parent)
+    local prev = _lastSectionOnPage[parent]
+    if prev then
+        container:SetPoint("TOPLEFT",  prev.container, "BOTTOMLEFT", 0, -SECTION_GAP)
+        container:SetPoint("TOPRIGHT", parent,         "TOPRIGHT",   0, 0)
+    else
+        -- First section on the page anchors at the requested y offset.
+        container:SetPoint("TOPLEFT",  parent, "TOPLEFT",  0, y)
+        container:SetPoint("TOPRIGHT", parent, "TOPRIGHT", 0, y)
+    end
+    container:SetHeight(COLLAPSED_HEIGHT)
+    section.container = container
+    _lastSectionOnPage[parent] = section
+    _allSectionsOnPage[parent] = _allSectionsOnPage[parent] or {}
+    _allSectionsOnPage[parent][#_allSectionsOnPage[parent] + 1] = section
+
+    -- Header inside the container at (x, 0)
+    local header = container:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    header:SetPoint("TOPLEFT", container, "TOPLEFT", x, 0)
     header:SetTextColor(1, 0.82, 0)
+    header:SetText(title)
     section.header = header
 
-    header:SetText(title)
-
-    -- Chevron (collapsed indicator) — texture, shown to the RIGHT of the title.
-    -- Uses Blizzard's PlusMinus button textures so it renders in any locale font.
-    local chevron = parent:CreateTexture(nil, "OVERLAY")
+    -- Chevron (collapsed indicator) — Blizzard PlusMinus textures
+    local chevron = container:CreateTexture(nil, "OVERLAY")
     chevron:SetSize(14, 14)
     chevron:SetPoint("LEFT", header, "RIGHT", 4, -1)
     section.chevron = chevron
-    local TEX_EXPANDED  = "Interface\\Buttons\\UI-MinusButton-Up"  -- shown when section is expanded (click = collapse)
-    local TEX_COLLAPSED = "Interface\\Buttons\\UI-PlusButton-Up"   -- shown when section is collapsed (click = expand)
+    local TEX_EXPANDED  = "Interface\\Buttons\\UI-MinusButton-Up"
+    local TEX_COLLAPSED = "Interface\\Buttons\\UI-PlusButton-Up"
 
-    -- Invisible click area covering the header + a slice of the divider line
-    local clickArea = CreateFrame("Button", nil, parent)
-    clickArea:SetPoint("TOPLEFT",  parent, "TOPLEFT", x - 14, y + 4)
-    clickArea:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -40,   y + 4)
+    -- Invisible click area covering the header strip
+    local clickArea = CreateFrame("Button", nil, container)
+    clickArea:SetPoint("TOPLEFT",  container, "TOPLEFT",  x - 14, -2)
+    clickArea:SetPoint("TOPRIGHT", container, "TOPRIGHT", -40,    -2)
     clickArea:SetHeight(18)
     clickArea:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     section.clickArea = clickArea
 
-    -- Reset section button (small "R") on the right side of the divider
-    local btnReset = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
+    -- Reset section button (small "R")
+    local btnReset = CreateFrame("Button", nil, container, "UIPanelButtonTemplate")
     btnReset:SetSize(20, 18)
-    btnReset:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -16, y + 2)
+    btnReset:SetPoint("TOPRIGHT", container, "TOPRIGHT", -16, -2)
     btnReset:SetText("R")
     section.resetBtn = btnReset
 
-    local line = parent:CreateTexture(nil, "OVERLAY")
+    local line = container:CreateTexture(nil, "OVERLAY")
     line:SetHeight(1)
     line:SetColorTexture(1, 0.82, 0, 0.55)
     section.line = line
 
-    local function place()
+    local function placeLine()
         local hw = header:GetStringWidth() or 0
-        local startX = x + hw + 4 + 14 + 8  -- header text + gap + chevron(14) + gap
+        local startX = x + hw + 4 + 14 + 8
         line:ClearAllPoints()
-        line:SetPoint("TOPLEFT",  parent, "TOPLEFT",  startX, y - 7)
-        line:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -42,    y - 7)
+        line:SetPoint("TOPLEFT",  container, "TOPLEFT",  startX, -7)
+        line:SetPoint("TOPRIGHT", container, "TOPRIGHT", -42,    -7)
+    end
+    placeLine()
+    C_Timer.After(0, placeLine)
+
+    function section:UpdateNaturalHeight()
+        if self._collapsed then
+            self.container:SetHeight(COLLAPSED_HEIGHT)
+            return
+        end
+        -- Compute lowest visible child relative to container TOP.
+        local cTop = self.container:GetTop()
+        if not cTop then
+            -- Anchors not resolved yet; defer one frame
+            C_Timer.After(0, function() self:UpdateNaturalHeight() end)
+            return
+        end
+        local lowest = cTop  -- pixels DOWN from cTop, smaller = lower on screen
+        for _, w in ipairs(self.children) do
+            if w.IsShown and w:IsShown() and w.GetBottom then
+                local b = w:GetBottom()
+                if b and b < lowest then lowest = b end
+            end
+        end
+        local span = math.max(COLLAPSED_HEIGHT, cTop - lowest + 8)
+        self.container:SetHeight(span)
     end
 
     function section:SetCollapsed(state, persist)
         state = state and true or false
         for _, w in ipairs(self.children) do
-            if state then
-                if w.Hide then w:Hide() end
-            else
-                if w.Show then w:Show() end
-            end
-            -- The dropdown's external label is registered separately; nothing
-            -- special needed here, the loop hides/shows it like everything else.
+            if state then if w.Hide then w:Hide() end
+            else            if w.Show then w:Show() end end
         end
         chevron:SetTexture(state and TEX_COLLAPSED or TEX_EXPANDED)
         if persist and self.key then
@@ -574,6 +663,11 @@ local function makeSection(parent, title, x, y, key)
             BossWatchDB.collapsedSections[self.key] = state or nil
         end
         self._collapsed = state
+        if state then
+            self.container:SetHeight(COLLAPSED_HEIGHT)
+        else
+            self:UpdateNaturalHeight()
+        end
     end
 
     function section:Toggle()
@@ -594,27 +688,18 @@ local function makeSection(parent, title, x, y, key)
     clickArea:SetScript("OnClick", function() section:Toggle() end)
     btnReset:SetScript("OnClick", function() section:ResetToDefaults() end)
 
-    -- Initial collapsed state from DB
+    -- Restore collapsed state from DB
     BossWatchDB = BossWatchDB or {}
     local restored = BossWatchDB.collapsedSections and key and BossWatchDB.collapsedSections[key]
     section:SetCollapsed(restored or false, false)
 
-    -- Always include the section's own visual elements so they hide too when
-    -- the user collapses upstream sections. Header + line stay visible always
-    -- (clickable), so we DON'T register them.
-    -- chevron stays visible (shows state).
-    -- btnReset stays visible (lets user reset even when collapsed).
-
-    place()
-    C_Timer.After(0, place)
-
-    -- Tooltips on the header + reset
+    -- Tooltips
     if addTooltip then
         addTooltip(clickArea, L["Click to collapse/expand this section."])
         addTooltip(btnReset,  L["Reset this section to default values."])
     end
 
-    -- This section is now the active one; subsequent makeXxx widgets register here.
+    -- Subsequent makeXxx() / _registerInSection() calls will attach to this section.
     _currentSection = section
     return section
 end
@@ -1565,14 +1650,23 @@ local function build()
         end)
     end
 
-    pages.layout   = newPage("layout");   buildLayoutPage(pages.layout.content);     autoFitPage(pages.layout)
-    pages.bars     = newPage("bars");     buildBarsPage(pages.bars.content);         autoFitPage(pages.bars)
-    pages.cast     = newPage("cast");     buildCastPage(pages.cast.content);         autoFitPage(pages.cast)
-    pages.text     = newPage("text");     buildTextPage(pages.text.content);         autoFitPage(pages.text)
-    pages.raid     = newPage("raid");     buildRaidMarkerPage(pages.raid.content);   autoFitPage(pages.raid)
-    pages.auras    = newPage("auras");    buildAurasPage(pages.auras.content);       autoFitPage(pages.auras)
-    pages.profiles = newPage("profiles"); buildProfilesPage(pages.profiles.content); autoFitPage(pages.profiles)
-    pages.about    = newPage("about");    buildAboutPage(pages.about.content);       autoFitPage(pages.about)
+    local function buildPage(name, fn)
+        local p = newPage(name)
+        fn(p.content)
+        -- Recompute every section's natural height now that all children are anchored.
+        C_Timer.After(0, function() _refreshHeightsForPage(p.content) end)
+        autoFitPage(p)
+        return p
+    end
+
+    pages.layout   = buildPage("layout",   buildLayoutPage)
+    pages.bars     = buildPage("bars",     buildBarsPage)
+    pages.cast     = buildPage("cast",     buildCastPage)
+    pages.text     = buildPage("text",     buildTextPage)
+    pages.raid     = buildPage("raid",     buildRaidMarkerPage)
+    pages.auras    = buildPage("auras",    buildAurasPage)
+    pages.profiles = buildPage("profiles", buildProfilesPage)
+    pages.about    = buildPage("about",    buildAboutPage)
 
     local tabs = {
         { id = "layout",   label = L["Layout"] },
