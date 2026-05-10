@@ -519,12 +519,14 @@ local function makeSection(parent, title, x, y, key)
 
     header:SetText(title)
 
-    -- Chevron (collapsed indicator) shown to the RIGHT of the title
-    local chevron = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    chevron:SetPoint("LEFT", header, "RIGHT", 4, 0)
-    chevron:SetTextColor(1, 0.82, 0)
-    chevron:SetText("")  -- set by SetCollapsed
+    -- Chevron (collapsed indicator) — texture, shown to the RIGHT of the title.
+    -- Uses Blizzard's PlusMinus button textures so it renders in any locale font.
+    local chevron = parent:CreateTexture(nil, "OVERLAY")
+    chevron:SetSize(14, 14)
+    chevron:SetPoint("LEFT", header, "RIGHT", 4, -1)
     section.chevron = chevron
+    local TEX_EXPANDED  = "Interface\\Buttons\\UI-MinusButton-Up"  -- shown when section is expanded (click = collapse)
+    local TEX_COLLAPSED = "Interface\\Buttons\\UI-PlusButton-Up"   -- shown when section is collapsed (click = expand)
 
     -- Invisible click area covering the header + a slice of the divider line
     local clickArea = CreateFrame("Button", nil, parent)
@@ -534,11 +536,11 @@ local function makeSection(parent, title, x, y, key)
     clickArea:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     section.clickArea = clickArea
 
-    -- Reset section button (small ↺) on the right side of the divider
+    -- Reset section button (small "R") on the right side of the divider
     local btnReset = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
     btnReset:SetSize(20, 18)
     btnReset:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -16, y + 2)
-    btnReset:SetText("↺")
+    btnReset:SetText("R")
     section.resetBtn = btnReset
 
     local line = parent:CreateTexture(nil, "OVERLAY")
@@ -548,8 +550,7 @@ local function makeSection(parent, title, x, y, key)
 
     local function place()
         local hw = header:GetStringWidth() or 0
-        local cw = chevron:GetStringWidth() or 0
-        local startX = x + hw + (cw > 0 and (4 + cw) or 0) + 10
+        local startX = x + hw + 4 + 14 + 8  -- header text + gap + chevron(14) + gap
         line:ClearAllPoints()
         line:SetPoint("TOPLEFT",  parent, "TOPLEFT",  startX, y - 7)
         line:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -42,    y - 7)
@@ -566,7 +567,7 @@ local function makeSection(parent, title, x, y, key)
             -- The dropdown's external label is registered separately; nothing
             -- special needed here, the loop hides/shows it like everything else.
         end
-        chevron:SetText(state and "▸" or "▾")
+        chevron:SetTexture(state and TEX_COLLAPSED or TEX_EXPANDED)
         if persist and self.key then
             BossWatchDB = BossWatchDB or {}
             BossWatchDB.collapsedSections = BossWatchDB.collapsedSections or {}
