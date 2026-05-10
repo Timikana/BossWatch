@@ -662,19 +662,27 @@ local function makeSection(parent, title, x, y, key)
             self.container:SetHeight(COLLAPSED_HEIGHT)
             return
         end
-        -- Compute lowest visible child relative to container TOP.
         local cTop = self.container:GetTop()
         if not cTop then
-            -- Anchors not resolved yet; defer one frame
             C_Timer.After(0, function() self:UpdateNaturalHeight() end)
             return
         end
-        local lowest = cTop  -- pixels DOWN from cTop, smaller = lower on screen
+        local lowest, gotAnyChildPos = cTop, false
         for _, w in ipairs(self.children) do
             if w.IsShown and w:IsShown() and w.GetBottom then
                 local b = w:GetBottom()
-                if b and b < lowest then lowest = b end
+                if b then
+                    gotAnyChildPos = true
+                    if b < lowest then lowest = b end
+                end
             end
+        end
+        -- If we have children but none have a resolved bottom yet, defer.
+        -- Otherwise the container shrinks to COLLAPSED_HEIGHT, the next section
+        -- anchors right under it, and you get a stack of overlapping rows.
+        if not gotAnyChildPos and #self.children > 0 then
+            C_Timer.After(0, function() self:UpdateNaturalHeight() end)
+            return
         end
         local span = math.max(COLLAPSED_HEIGHT, cTop - lowest + 8)
         self.container:SetHeight(span)
