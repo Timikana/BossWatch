@@ -30,65 +30,22 @@ local function _refreshHeightsForPage(parent)
     end
 end
 
--- Tab badge wiring: build() registers (tabButton, pageContentFrame, originalLabel)
--- triples here; _applySearch updates the tab text with a "(N)" gold badge when
--- the active query has hits in that page.
+-- Tab badge wiring populated by build()
 local _searchTabRefs = {}
 
--- Apply a search query across every page. Empty query restores DB-saved
--- collapsed state. Non-empty: collapses sections without any match, expands
--- those with a hit on either the section title or any registered child label.
-local function _applySearch(rawQuery)
-    local q = (rawQuery or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
-    local empty = (q == "")
-    BossWatchDB = BossWatchDB or {}
-    local saved = BossWatchDB.collapsedSections or {}
-
-    -- per-page hit count, used to decorate the tab labels
-    local hitsByPage = {}
-
-    for page, sections in pairs(_allSectionsOnPage) do
-        local pageHits = 0
-        for _, section in ipairs(sections) do
-            if empty then
-                section:SetCollapsed(saved[section.key] and true or false, false)
-            else
-                local sectionTitleMatch = section._searchText
-                    and section._searchText:find(q, 1, true) ~= nil
-                local childHits = 0
-                for _, w in ipairs(section.children) do
-                    local txt = w._searchText
-                    if txt and txt:lower():find(q, 1, true) then
-                        childHits = childHits + 1
-                    end
-                end
-                local match = sectionTitleMatch or childHits > 0
-                -- A title-only match still counts as 1 hit so the tab badge isn't empty.
-                pageHits = pageHits + (childHits > 0 and childHits
-                                                    or (sectionTitleMatch and 1 or 0))
-                section:SetCollapsed(not match, false)
-            end
-        end
-        hitsByPage[page] = pageHits
-    end
-
-    -- Update each tab's text with "(N)" badge
-    for _, ref in ipairs(_searchTabRefs) do
-        local n = hitsByPage[ref.content] or 0
-        if empty or n == 0 then
-            ref.btn:SetText(ref.label)
-        else
-            ref.btn:SetText(ref.label .. " |cffeda14a(" .. n .. ")|r")
-        end
-        if PanelTemplates_TabResize then PanelTemplates_TabResize(ref.btn, 0) end
-    end
-end
+-- Forward declaration: the actual search implementation lives inside build()
+-- so it can close over `pages`, the results page, and `selectTab`. The search
+-- EditBox calls _applySearch() which delegates here.
+local _searchImpl = function() end
+local function _applySearch(q) return _searchImpl(q) end
 
 local function _captureAndReparent(widget, container, sectionOriginY)
     -- Reparent the widget to the section container so it inherits visibility
     -- (we still call Hide() on collapse for click-through reasons).
     -- Convert page-relative anchors to container-relative so when the container
     -- moves up after a previous section is collapsed, the widget moves with it.
+    -- We also stash _homeContainer + _homeAnchors so the search results page
+    -- can move the widget out and put it back later.
     if not widget or not widget.GetPoint or not widget.SetPoint or not widget.SetParent then return end
     local nPoints = widget.GetNumPoints and widget:GetNumPoints() or 0
     if nPoints == 0 then return end
@@ -101,23 +58,24 @@ local function _captureAndReparent(widget, container, sectionOriginY)
     end
     widget:SetParent(container)
     widget:ClearAllPoints()
-    for _, a in ipairs(saved) do
+    widget._homeContainer = container
+    widget._homeAnchors = {}
+    for i, a in ipairs(saved) do
+        local newY = a.y
+        local relTo = a.relTo
         if a.relTo == pageRoot or a.relTo == nil then
-            -- Was page-relative: rebase onto the container at the same x, y shifted
-            -- by the section's own y offset on the page.
-            widget:SetPoint(a.p, container, a.relPoint, a.x, a.y - sectionOriginY)
-        else
-            -- Was relative to another widget (typically labelFS for a dropdown);
-            -- that other widget is also reparented + re-anchored to the container,
-            -- so the chain still resolves correctly. Keep as-is.
-            widget:SetPoint(a.p, a.relTo, a.relPoint, a.x, a.y)
+            relTo = container
+            newY = a.y - sectionOriginY
         end
+        widget:SetPoint(a.p, relTo, a.relPoint, a.x, newY)
+        widget._homeAnchors[i] = { p = a.p, relTo = relTo, relPoint = a.relPoint, x = a.x, y = newY }
     end
 end
 
 local function _registerInSection(widget, dbKey)
     if _currentSection and widget then
         _captureAndReparent(widget, _currentSection.container, _currentSection._originalY)
+        widget._homeSection = _currentSection
         _currentSection.children[#_currentSection.children + 1] = widget
         if dbKey then _currentSection.dbKeys[#_currentSection.dbKeys + 1] = dbKey end
     end
@@ -230,6 +188,7 @@ local function makeSlider(parent, label, key, minV, maxV, step, x, y, width)
 
     sl.refresh = function() sl:Init(readDB(), minV, maxV, numSteps, formatters) end
     sl._searchText = label or ""
+    sl._searchGroup = { sl }
     _registerInSection(sl, key)
     return sl
 end
@@ -246,6 +205,7 @@ local function makeCheck(parent, label, key, x, y)
         refresh()
     end)
     cb._searchText = label or ""
+    cb._searchGroup = { cb }
     _registerInSection(cb, key)
     return cb
 end
@@ -275,6 +235,7 @@ local function makeDropdown(parent, label, key, options, x, y, width)
     dd.refresh = function() dd:GenerateMenu() end
     dd._labelFS = labelFS
     dd._searchText = label or ""
+    dd._searchGroup = { labelFS, dd }
     _registerInSection(dd, key)
     _registerInSection(labelFS)
     return dd
@@ -484,6 +445,7 @@ local function makeMediaDropdown(parent, label, key, mediaType, x, y, width, tin
     -- Register all the sibling regions of the media dropdown so that collapsing
     -- the section hides the label and the preview as well, not just the button.
     btn._searchText = label or ""
+    btn._searchGroup = { labelFS, btn, previewBg, previewBorder, (previewTex or previewText) }
     _registerInSection(btn, key)
     _registerInSection(labelFS)
     _registerInSection(previewBg)
@@ -594,6 +556,7 @@ local function makeColorPicker(parent, label, dbKey, x, y)
 
     btn.dbKey = dbKey
     btn._searchText = label or ""
+    btn._searchGroup = lab and { lab, btn } or { btn }
     _registerInSection(btn, dbKey)
     if lab then _registerInSection(lab) end
     return btn
@@ -1774,6 +1737,148 @@ local function build()
     pages.profiles = buildPage("profiles", buildProfilesPage)
     pages.about    = buildPage("about",    buildAboutPage)
 
+    -- Hidden "search results" page — not in the tab list. When the search box
+    -- has a query, every matching widget group is reparented here on the fly,
+    -- with a breadcrumb pointing back to its real tab/section.
+    local resultsPage = newPage("results")
+    local resultsContent = resultsPage.content
+    pages._results = resultsPage  -- registered so we can hide it via the for-loop
+
+    local breadcrumbPool = {}
+    local activeMatches = {}    -- widgets currently moved out to results
+    local lastNormalTabId = "layout"
+
+    local function _moveGroupToResults(w, y)
+        if not w._searchGroup then return y end
+        for _, comp in ipairs(w._searchGroup) do
+            if comp and comp.SetParent then
+                comp:SetParent(resultsContent)
+                if comp.Show then comp:Show() end
+            end
+        end
+        local leader = w._searchGroup[1]
+        if leader and leader.ClearAllPoints then
+            leader:ClearAllPoints()
+            leader:SetPoint("TOPLEFT", resultsContent, "TOPLEFT", 14, y)
+        end
+        return y - 64  -- breadcrumb (14) + widget row (~50)
+    end
+
+    local function _restoreGroupHome(w)
+        if not w._searchGroup then return end
+        for _, comp in ipairs(w._searchGroup) do
+            if comp and comp._homeContainer and comp.SetParent then
+                comp:SetParent(comp._homeContainer)
+            end
+            if comp and comp._homeAnchors and comp.ClearAllPoints then
+                comp:ClearAllPoints()
+                for _, a in ipairs(comp._homeAnchors) do
+                    comp:SetPoint(a.p, a.relTo, a.relPoint, a.x, a.y)
+                end
+            end
+        end
+    end
+
+    local function _gatherMatches(query)
+        local matches = {}
+        for _, sections in pairs(_allSectionsOnPage) do
+            for _, section in ipairs(sections) do
+                for _, w in ipairs(section.children) do
+                    local txt = w._searchText
+                    if txt and w._searchGroup and txt:lower():find(query, 1, true) then
+                        matches[#matches + 1] = w
+                    end
+                end
+            end
+        end
+        return matches
+    end
+
+    -- Real search implementation, assigned to the forward-declared upvalue.
+    _searchImpl = function(rawQuery)
+        local q = (rawQuery or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
+        local empty = (q == "")
+
+        -- Always clear out the previous results state first
+        for _, w in ipairs(activeMatches) do _restoreGroupHome(w) end
+        wipe(activeMatches)
+        for _, fs in ipairs(breadcrumbPool) do fs:Hide() end
+
+        if empty then
+            resultsPage:Hide()
+            for _, p in pairs(pages) do
+                if p ~= resultsPage then p:Hide() end
+            end
+            if pages[lastNormalTabId] then pages[lastNormalTabId]:Show() end
+            for _, ref in ipairs(_searchTabRefs) do
+                ref.btn:SetText(ref.label)
+                if PanelTemplates_TabResize then PanelTemplates_TabResize(ref.btn, 0) end
+            end
+            return
+        end
+
+        local matches = _gatherMatches(q)
+
+        -- Hide every regular page and show the results page instead
+        for _, p in pairs(pages) do
+            if p ~= resultsPage then p:Hide() end
+        end
+
+        local hitsByPage = {}
+        local y = -10
+        for i, w in ipairs(matches) do
+            local fs = breadcrumbPool[i]
+            if not fs then
+                fs = resultsContent:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+                breadcrumbPool[i] = fs
+            end
+            fs:Show()
+            fs:ClearAllPoints()
+            fs:SetPoint("TOPLEFT", resultsContent, "TOPLEFT", 14, y)
+            local section = w._homeSection
+            local sectionTitle = (section and section.header and section.header:GetText()) or "?"
+            local pageContent = section and section._parent
+            local tabLabel = "?"
+            for _, ref in ipairs(_searchTabRefs) do
+                if ref.content == pageContent then tabLabel = ref.label; break end
+            end
+            fs:SetText("|cff888888" .. tabLabel .. "  >  " .. sectionTitle .. "|r")
+
+            if pageContent then hitsByPage[pageContent] = (hitsByPage[pageContent] or 0) + 1 end
+
+            y = y - 14  -- breadcrumb height + small gap before widget
+            y = _moveGroupToResults(w, y)
+            activeMatches[#activeMatches + 1] = w
+        end
+
+        if #matches == 0 then
+            local fs = breadcrumbPool[1]
+            if not fs then
+                fs = resultsContent:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+                breadcrumbPool[1] = fs
+            end
+            fs:Show()
+            fs:ClearAllPoints()
+            fs:SetPoint("TOPLEFT", resultsContent, "TOPLEFT", 14, -20)
+            fs:SetText(L["No options match your search."])
+        end
+
+        resultsContent:SetHeight(math.max(resultsPage:GetHeight(), math.abs(y) + 24))
+        resultsPage:Show()
+
+        -- Update tab labels with hit counts (so the user sees where matches live
+        -- once they clear the search and want to dive in normally).
+        for _, ref in ipairs(_searchTabRefs) do
+            local n = hitsByPage[ref.content] or 0
+            if n == 0 then
+                ref.btn:SetText(ref.label)
+            else
+                ref.btn:SetText(ref.label .. " |cffeda14a(" .. n .. ")|r")
+            end
+            if PanelTemplates_TabResize then PanelTemplates_TabResize(ref.btn, 0) end
+        end
+    end
+
     local tabs = {
         { id = "layout",   label = L["Layout"] },
         { id = "bars",     label = L["Bars"] },
@@ -1786,6 +1891,12 @@ local function build()
     }
     local tabBtns = {}
     local function selectTab(id)
+        -- If a search is active, clear it before switching (which restores the
+        -- widgets reparented to the results page).
+        if searchBox and searchBox:GetText() ~= "" then
+            searchBox:SetText("")
+        end
+        lastNormalTabId = id
         for _, p in pairs(pages) do p:Hide() end
         if pages[id] then pages[id]:Show() end
         for _, t in ipairs(tabBtns) do

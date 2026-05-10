@@ -384,6 +384,7 @@ L["Reset the options window to its default size and position."]                 
 L["Search options…"]                                                                 = "Rechercher…"
 L["Filter the panel: type any keyword from a label or tooltip. Sections without a match are auto-collapsed."] = "Filtrer le panneau : tape un mot-clé d'un libellé ou d'une astuce. Les sections sans correspondance se replient automatiquement."
 L["Clear the search."]                                                               = "Effacer la recherche."
+L["No options match your search."]                                                   = "Aucune option ne correspond à ta recherche."
 
 -- ============================================================
 -- SECTION HEADERS (UI reorg)
