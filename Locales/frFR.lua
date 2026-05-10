@@ -15,6 +15,7 @@ L["Raid Marker"] = "Marqueur"
 L["Auras"]       = "Auras"
 L["Profiles"]    = "Profils"
 L["About"]       = "À propos"
+L["Changelog"]   = "Nouveautés"
 
 -- ============================================================
 -- PROFILES PAGE
@@ -389,6 +390,31 @@ L["Smooth bar animation"]                                                       
 L["Animate the health bar between values instead of jumping. Disable for instant updates."] = "Anime la barre de vie entre les valeurs au lieu de sauter. Désactive pour des mises à jour instantanées."
 L["Click actions on boss frames"]                                                    = "Actions au clic sur les cadres de boss"
 L["Enable modifier+click shortcuts on boss frames: Shift+Click cycles a raid marker, Ctrl+Click sets focus."] = "Active les raccourcis modificateur+clic : Maj+Clic fait tourner les marqueurs de raid, Ctrl+Clic met en focus."
+
+-- Changelog tab
+L["Release notes and recent changes."] = "Notes de version et changements récents."
+L["Compatibility with WoW patch 12.0.7 (no more out-of-date warning)."] = "Compatibilité avec le patch WoW 12.0.7 (plus d'avertissement \"obsolète\")."
+L["Damage absorption / shields are now drawn over the boss health bar."] = "Les absorptions et boucliers s'affichent désormais en surcouche sur la barre de vie du boss."
+L["Modernized options panel using the WoW 11/12 portrait style."] = "Panneau d'options modernisé au style WoW 11/12 (PortraitFrame)."
+L["Highlight border around the boss frame matching your current target (with optional pulse)."] = "Bordure colorée autour du cadre boss correspondant à ta cible courante (animation de pulsation en option)."
+L["3-block (compact) or 4-block (name on its own row) layout."] = "Disposition 3 blocs (compact) ou 4 blocs (nom sur sa propre rangée)."
+L["Themed test mode: Lich King, Kel'Thuzad, Onyxia, Ragnaros, Illidan."] = "Mode test thématisé : Roi-Liche, Kel'Thuzad, Onyxia, Ragnaros, Illidan."
+L["Full localization: French, German, Spanish, Italian, Brazilian Portuguese."] = "Traductions complètes : français, allemand, espagnol, italien, portugais brésilien."
+L["Tooltips on every control, including the bottom tabs."] = "Astuces (tooltips) sur tous les contrôles, y compris les onglets en bas."
+L["Search bar (top-right of the panel) gathers matches from every tab onto a Results page — Blizzard-style."] = "Barre de recherche (en haut à droite) qui rassemble les matches de tous les onglets sur une page Résultats — style Blizzard."
+L["Collapsible sections with a per-section reset button (refresh icon)."] = "Sections repliables avec bouton de réinitialisation par section (icône refresh)."
+L["Resizable options window: drag the bottom-right grip; size and position are saved account-wide."] = "Fenêtre d'options redimensionnable : glisse le coin bas-droit ; taille et position sauvegardées pour tout le compte."
+L["Auto-flow: right-column controls slide along with the right edge when the panel is widened."] = "Auto-flow : les contrôles de la colonne de droite glissent avec le bord droit quand tu agrandis le panneau."
+L["Click actions on boss frames: Shift+Click cycles raid markers, Ctrl+Click sets focus."] = "Actions au clic sur les cadres boss : Maj+Clic fait tourner les marqueurs de raid, Ctrl+Clic met en focus."
+L["Smooth health bar animation."] = "Animation fluide de la barre de vie."
+L["Modern UI portrait frame, scrollable LSM media dropdowns with previews."] = "Cadre PortraitFrame moderne, dropdowns LSM avec aperçu et défilement."
+L["Profile import/export with overwrite confirmation."] = "Import/export de profils avec confirmation d'écrasement."
+L["Polished defaults for textures and font, fixed bugs around HP/Power text on hostile bosses."] = "Valeurs par défaut peaufinées pour les textures et la police, corrections autour du texte PV/Ressource sur les boss hostiles."
+L["Frame background controls and target highlight color modes."] = "Contrôles d'arrière-plan du cadre et modes de couleur de la surbrillance de cible."
+L["German, Spanish, Italian and Brazilian Portuguese locale stubs."] = "Bases de traduction allemande, espagnole, italienne et portugaise brésilienne."
+L["Profile system, minimap icon, target highlight, color pickers."] = "Système de profils, icône minimap, surbrillance de cible, sélecteurs de couleur."
+L["Initial release: custom boss target frames extracted from DandersFrames."] = "Version initiale : cadres de boss personnalisés extraits de DandersFrames."
+L["Full GitHub history: https://github.com/Timikana/BossWatch/releases"] = "Historique complet GitHub : https://github.com/Timikana/BossWatch/releases"
 
 -- ============================================================
 -- SECTION HEADERS (UI reorg)

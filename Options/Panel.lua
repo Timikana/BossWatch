@@ -831,6 +831,7 @@ local TAB_TOOLTIPS = {
     auras    = L["Buffs and debuffs filtering, source, layout."],
     profiles = L["Per-character profiles, import/export."],
     about    = L["Version, links, slash commands."],
+    changelog= L["Release notes and recent changes."],
 }
 
 local function makeTab(parent, id, label, idx, prevTab)
@@ -1601,6 +1602,73 @@ local function buildAboutPage(page)
     hint:SetText(L["Click a URL to select it, then Ctrl+C to copy."])
 end
 
+local function buildChangelogPage(page)
+    _currentSection = nil  -- raw content, no sections
+
+    -- Per-version blocks. Each entry: { version, date, lines = { ... } }
+    local entries = {
+        { ver = "v0.5.1", date = "2026-05-10", lines = {
+            L["Compatibility with WoW patch 12.0.7 (no more out-of-date warning)."],
+        }},
+        { ver = "v0.5.0", date = "2026-05-10", lines = {
+            L["Damage absorption / shields are now drawn over the boss health bar."],
+            L["Modernized options panel using the WoW 11/12 portrait style."],
+            L["Highlight border around the boss frame matching your current target (with optional pulse)."],
+            L["3-block (compact) or 4-block (name on its own row) layout."],
+            L["Themed test mode: Lich King, Kel'Thuzad, Onyxia, Ragnaros, Illidan."],
+            L["Full localization: French, German, Spanish, Italian, Brazilian Portuguese."],
+            L["Tooltips on every control, including the bottom tabs."],
+            L["Search bar (top-right of the panel) gathers matches from every tab onto a Results page — Blizzard-style."],
+            L["Collapsible sections with a per-section reset button (refresh icon)."],
+            L["Resizable options window: drag the bottom-right grip; size and position are saved account-wide."],
+            L["Auto-flow: right-column controls slide along with the right edge when the panel is widened."],
+            L["Click actions on boss frames: Shift+Click cycles raid markers, Ctrl+Click sets focus."],
+            L["Smooth health bar animation."],
+        }},
+        { ver = "v0.4.x", date = "2026-04", lines = {
+            L["Modern UI portrait frame, scrollable LSM media dropdowns with previews."],
+            L["Profile import/export with overwrite confirmation."],
+            L["Polished defaults for textures and font, fixed bugs around HP/Power text on hostile bosses."],
+        }},
+        { ver = "v0.3.x", date = "2026-03", lines = {
+            L["Frame background controls and target highlight color modes."],
+            L["German, Spanish, Italian and Brazilian Portuguese locale stubs."],
+        }},
+        { ver = "v0.2.0", date = "2026-02", lines = {
+            L["Profile system, minimap icon, target highlight, color pickers."],
+        }},
+        { ver = "v0.1.0", date = "2026-01", lines = {
+            L["Initial release: custom boss target frames extracted from DandersFrames."],
+        }},
+    }
+
+    local y = -10
+    for _, entry in ipairs(entries) do
+        local title = page:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+        title:SetPoint("TOPLEFT", 14, y)
+        title:SetText("|cffeda14a" .. entry.ver .. "|r  |cff888888" .. entry.date .. "|r")
+        y = y - 22
+
+        for _, line in ipairs(entry.lines) do
+            local fs = page:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+            fs:SetPoint("TOPLEFT", 24, y)
+            fs:SetWidth(620)
+            fs:SetJustifyH("LEFT")
+            fs:SetSpacing(2)
+            fs:SetText("• " .. line)
+            -- GetStringHeight needs a layout pass; estimate generously per line
+            -- so very long entries don't overlap. C_Timer fix-up could refine.
+            local lines = math.max(1, math.ceil(#line / 90))
+            y = y - (lines * 16 + 4)
+        end
+        y = y - 14
+    end
+
+    local hint = page:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    hint:SetPoint("TOPLEFT", 14, y - 6)
+    hint:SetText(L["Full GitHub history: https://github.com/Timikana/BossWatch/releases"])
+end
+
 -- ============================================================
 -- BUILD
 -- ============================================================
@@ -1785,6 +1853,7 @@ local function build()
     pages.auras    = buildPage("auras",    buildAurasPage)
     pages.profiles = buildPage("profiles", buildProfilesPage)
     pages.about    = buildPage("about",    buildAboutPage)
+    pages.changelog= buildPage("changelog", buildChangelogPage)
 
     -- Hidden "search results" page — not in the tab list. When the search box
     -- has a query, every matching widget group is reparented here on the fly,
@@ -1937,6 +2006,7 @@ local function build()
         { id = "auras",    label = L["Auras"] },
         { id = "profiles", label = L["Profiles"] },
         { id = "about",    label = L["About"] },
+        { id = "changelog",label = L["Changelog"] },
     }
     local tabBtns = {}
     local function selectTab(id)
