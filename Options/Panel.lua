@@ -2081,16 +2081,18 @@ local function build()
     local sideTabs = {
         { id = "BossWatch",  isSelf = true,  icon = "Interface\\AddOns\\BossWatch\\Media\\logo.png",
           tooltip = L["BossWatch — Options"], onClick = function() end },
-        { id = "TankWatch",  isSelf = false, icon = "Interface\\AddOns\\TankWatch\\Media\\logo.png",
+        { id = "TankWatch",  isSelf = false, icon = "Interface\\AddOns\\TankWatch\\Media\\icon",
           tooltip = L["Open TankWatch options"],
           loadedCheck = function()
+              local TW = _G.TankWatch
               return C_AddOns and C_AddOns.IsAddOnLoaded
                      and C_AddOns.IsAddOnLoaded("TankWatch")
-                     and _G.TW and _G.TW.ToggleOptions
+                     and TW and TW.ToggleOptions
           end,
           onClick = function()
               if panel and panel:IsShown() then panel:Hide() end
-              if _G.TW and _G.TW.ToggleOptions then _G.TW:ToggleOptions() end
+              local TW = _G.TankWatch
+              if TW and TW.ToggleOptions then TW:ToggleOptions() end
           end },
     }
 
