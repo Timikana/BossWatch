@@ -1603,6 +1603,10 @@ local function buildChangelogPage(page)
 
     -- Per-version blocks. Each entry: { version, date, lines = { ... } }
     local entries = {
+        { ver = "v0.7.1", date = "2026-05-10", lines = {
+            L["Hotfix: smooth health bar no longer spams Lua errors when a boss returns a secret-tagged HP value (the bar falls back to direct, non-animated updates on those bosses)."],
+            L["Hotfix: raid target icons (skull, cross…) placed on bosses during combat now display correctly on the BossWatch frame instead of staying hidden."],
+        }},
         { ver = "v0.7.0", date = "2026-05-10", lines = {
             L["Mists of Pandaria Classic support: a single zip now installs on retail and MoP Classic."],
             L["New slash command: /bossw (with alias /bosswatch). The old /bw is gone — that prefix collides with BigWigs."],

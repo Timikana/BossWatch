@@ -397,6 +397,8 @@ L["Enable modifier+click shortcuts on boss frames: Shift+Click cycles a raid mar
 -- Changelog tab
 L["Release notes and recent changes."] = "Notes de version et changements récents."
 L["Compatibility with WoW patch 12.0.7 (no more out-of-date warning)."] = "Compatibilité avec le patch WoW 12.0.7 (plus d'avertissement \"obsolète\")."
+L["Hotfix: smooth health bar no longer spams Lua errors when a boss returns a secret-tagged HP value (the bar falls back to direct, non-animated updates on those bosses)."] = "Hotfix : la barre de vie animée ne spamme plus d'erreur Lua quand un boss renvoie une valeur PV secret-tagged (la barre se rabat sur des mises à jour directes non animées sur ces boss)."
+L["Hotfix: raid target icons (skull, cross…) placed on bosses during combat now display correctly on the BossWatch frame instead of staying hidden."] = "Hotfix : les marques de raid (tête de mort, croix…) posées sur des boss en combat s'affichent maintenant correctement sur le frame BossWatch au lieu de rester cachées."
 L["Mists of Pandaria Classic support: a single zip now installs on retail and MoP Classic."] = "Support Mists of Pandaria Classic : un seul zip s'installe maintenant sur retail et MoP Classic."
 L["New slash command: /bossw (with alias /bosswatch). The old /bw is gone — that prefix collides with BigWigs."] = "Nouvelle commande : /bossw (avec alias /bosswatch). L'ancien /bw a disparu — ce préfixe entrait en collision avec BigWigs."
 L["Bottom tabs now wrap onto a second row when the panel is too narrow, with proper layering so nothing gets clipped."] = "Les onglets du bas passent maintenant sur une seconde ligne quand le panneau est trop étroit, avec un bon ordre d'affichage pour éviter les clips."
