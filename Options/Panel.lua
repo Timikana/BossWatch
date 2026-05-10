@@ -1580,6 +1580,22 @@ local function buildAboutPage(page)
     end)
     addTooltip(btnResetWin, L["Reset the options window to its default size and position."])
 
+    -- Sister-addon switcher: shown only if TankWatch is loaded. One-click jump
+    -- to its options panel (and we close ours).
+    local isTWLoaded = C_AddOns and C_AddOns.IsAddOnLoaded and C_AddOns.IsAddOnLoaded("TankWatch")
+    local twToggle = _G.TW and _G.TW.ToggleOptions
+    if isTWLoaded and twToggle then
+        local btnSwitchTW = CreateFrame("Button", nil, page, "UIPanelButtonTemplate")
+        btnSwitchTW:SetSize(180, 22)
+        btnSwitchTW:SetPoint("LEFT", btnResetWin, "RIGHT", 8, 0)
+        btnSwitchTW:SetText("|cffeda14a→|r " .. L["Open TankWatch options"])
+        btnSwitchTW:SetScript("OnClick", function()
+            if panel and panel:IsShown() then panel:Hide() end
+            _G.TW:ToggleOptions()
+        end)
+        addTooltip(btnSwitchTW, L["Close BossWatch and open the TankWatch options panel."])
+    end
+
     local cmdHeader = page:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     cmdHeader:SetPoint("TOPLEFT", 14, -500)
     cmdHeader:SetText(L["Slash commands"])
