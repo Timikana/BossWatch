@@ -7,6 +7,11 @@ local pairs, ipairs = pairs, ipairs
 local panel
 local refresh = function() if BW.RefreshAll then BW:RefreshAll() end end
 
+-- Forward-declare so that helpers defined earlier in the file (makeSection,
+-- factories) can capture the same local — otherwise Lua resolves the name
+-- as a global (nil), and tooltips silently never get attached.
+local addTooltip
+
 -- Module-level pointer used by widget factories to auto-register with the
 -- currently-being-built section. Each makeSection() updates this; each
 -- makeXxx() factory pushes itself onto _currentSection.children/dbKeys.
@@ -708,7 +713,7 @@ end
 
 -- Hover tooltip helper. Hooks the widget AND any well-known child controls
 -- (slider thumb, steppers) so the tooltip shows everywhere on composite widgets.
-local function addTooltip(widget, text)
+addTooltip = function(widget, text)
     if not widget or not text or text == "" then return widget end
     local function show(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
