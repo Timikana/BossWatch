@@ -387,6 +387,8 @@ L["Close BossWatch and open the TankWatch options panel."]                      
 L["Search options…"]                                                                 = "Rechercher…"
 L["Filter the panel: type any keyword from a label or tooltip. Sections without a match are auto-collapsed."] = "Filtrer le panneau : tape un mot-clé d'un libellé ou d'une astuce. Les sections sans correspondance se replient automatiquement."
 L["Clear the search."]                                                               = "Effacer la recherche."
+L["Show Tooltip on Hover"]                                                           = "Afficher l'infobulle au survol"
+L["Show the standard Blizzard tooltip when hovering an aura icon. Some boss debuffs may show partial info due to the secret-value protection of WoW Midnight."] = "Affiche l'infobulle Blizzard standard au survol d'une icône d'aura. Certains debuffs de boss peuvent montrer des infos incomplètes à cause de la protection secret-value de WoW Midnight."
 L["⚠ Classic build — UI not fully tested in encounters yet, please report bugs."]    = "⚠ Version Classic — interface pas encore testée à 100 % en donjon/raid, merci de remonter les bugs."
 L["No options match your search."]                                                   = "Aucune option ne correspond à ta recherche."
 L["Smooth bar animation"]                                                            = "Animation fluide des barres"
@@ -397,6 +399,7 @@ L["Enable modifier+click shortcuts on boss frames: Shift+Click cycles a raid mar
 -- Changelog tab
 L["Release notes and recent changes."] = "Notes de version et changements récents."
 L["Compatibility with WoW patch 12.0.7 (no more out-of-date warning)."] = "Compatibilité avec le patch WoW 12.0.7 (plus d'avertissement \"obsolète\")."
+L["Hover an aura icon on a boss frame to see its standard Blizzard tooltip — name, description, remaining duration. Toggle in Auras > Display."] = "Survole une icône d'aura sur un frame boss pour voir son infobulle Blizzard standard — nom, description, durée restante. Bascule dans Auras > Affichage."
 L["Hotfix: smooth health bar no longer spams Lua errors when a boss returns a secret-tagged HP value (the bar falls back to direct, non-animated updates on those bosses)."] = "Hotfix : la barre de vie animée ne spamme plus d'erreur Lua quand un boss renvoie une valeur PV secret-tagged (la barre se rabat sur des mises à jour directes non animées sur ces boss)."
 L["Hotfix: raid target icons (skull, cross…) placed on bosses during combat now display correctly on the BossWatch frame instead of staying hidden."] = "Hotfix : les marques de raid (tête de mort, croix…) posées sur des boss en combat s'affichent maintenant correctement sur le frame BossWatch au lieu de rester cachées."
 L["Mists of Pandaria Classic support: a single zip now installs on retail and MoP Classic."] = "Support Mists of Pandaria Classic : un seul zip s'installe maintenant sur retail et MoP Classic."

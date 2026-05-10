@@ -1250,6 +1250,9 @@ local function buildAurasPage(page)
     addTooltip(makeCheck(page, L["Show Timer"],  "aurasShowTimer",  184, y),
         L["Display the remaining duration on the icon."])
     y = y - 30
+    addTooltip(makeCheck(page, L["Show Tooltip on Hover"], "aurasTooltip", 14, y),
+        L["Show the standard Blizzard tooltip when hovering an aura icon. Some boss debuffs may show partial info due to the secret-value protection of WoW Midnight."])
+    y = y - 30
     addTooltip(makeDropdown(page, L["Timer Placement"], "aurasTimerPlacement", {
         { text = L["Inside (centered)"], value = "INSIDE" },
         { text = L["Below icon"],        value = "BELOW" },
@@ -1603,6 +1606,9 @@ local function buildChangelogPage(page)
 
     -- Per-version blocks. Each entry: { version, date, lines = { ... } }
     local entries = {
+        { ver = "v0.7.2", date = "2026-05-10", lines = {
+            L["Hover an aura icon on a boss frame to see its standard Blizzard tooltip — name, description, remaining duration. Toggle in Auras > Display."],
+        }},
         { ver = "v0.7.1", date = "2026-05-10", lines = {
             L["Hotfix: smooth health bar no longer spams Lua errors when a boss returns a secret-tagged HP value (the bar falls back to direct, non-animated updates on those bosses)."],
             L["Hotfix: raid target icons (skull, cross…) placed on bosses during combat now display correctly on the BossWatch frame instead of staying hidden."],
