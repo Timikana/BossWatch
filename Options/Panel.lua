@@ -30,6 +30,11 @@ local function _refreshHeightsForPage(parent)
     end
 end
 
+-- Tab badge wiring: build() registers (tabButton, pageContentFrame, originalLabel)
+-- triples here; _applySearch updates the tab text with a "(N)" gold badge when
+-- the active query has hits in that page.
+local _searchTabRefs = {}
+
 -- Apply a search query across every page. Empty query restores DB-saved
 -- collapsed state. Non-empty: collapses sections without any match, expands
 -- those with a hit on either the section title or any registered child label.
@@ -39,24 +44,43 @@ local function _applySearch(rawQuery)
     BossWatchDB = BossWatchDB or {}
     local saved = BossWatchDB.collapsedSections or {}
 
-    for _, sections in pairs(_allSectionsOnPage) do
+    -- per-page hit count, used to decorate the tab labels
+    local hitsByPage = {}
+
+    for page, sections in pairs(_allSectionsOnPage) do
+        local pageHits = 0
         for _, section in ipairs(sections) do
             if empty then
                 section:SetCollapsed(saved[section.key] and true or false, false)
             else
-                local match = section._searchText and section._searchText:find(q, 1, true) ~= nil
-                if not match then
-                    for _, w in ipairs(section.children) do
-                        local txt = w._searchText
-                        if txt and txt:lower():find(q, 1, true) then
-                            match = true
-                            break
-                        end
+                local sectionTitleMatch = section._searchText
+                    and section._searchText:find(q, 1, true) ~= nil
+                local childHits = 0
+                for _, w in ipairs(section.children) do
+                    local txt = w._searchText
+                    if txt and txt:lower():find(q, 1, true) then
+                        childHits = childHits + 1
                     end
                 end
+                local match = sectionTitleMatch or childHits > 0
+                -- A title-only match still counts as 1 hit so the tab badge isn't empty.
+                pageHits = pageHits + (childHits > 0 and childHits
+                                                    or (sectionTitleMatch and 1 or 0))
                 section:SetCollapsed(not match, false)
             end
         end
+        hitsByPage[page] = pageHits
+    end
+
+    -- Update each tab's text with "(N)" badge
+    for _, ref in ipairs(_searchTabRefs) do
+        local n = hitsByPage[ref.content] or 0
+        if empty or n == 0 then
+            ref.btn:SetText(ref.label)
+        else
+            ref.btn:SetText(ref.label .. " |cffeda14a(" .. n .. ")|r")
+        end
+        if PanelTemplates_TabResize then PanelTemplates_TabResize(ref.btn, 0) end
     end
 end
 
@@ -1773,10 +1797,16 @@ local function build()
         end
     end
 
+    wipe(_searchTabRefs)
     for i, t in ipairs(tabs) do
         local b = makeTab(panel, t.id, t.label, i, tabBtns[i - 1])
         b:SetScript("OnClick", function() selectTab(t.id) end)
         tabBtns[#tabBtns + 1] = b
+        if pages[t.id] and pages[t.id].content then
+            _searchTabRefs[#_searchTabRefs + 1] = {
+                btn = b, content = pages[t.id].content, label = t.label,
+            }
+        end
     end
 
     panel.refreshAll = function()
