@@ -13,6 +13,7 @@ L["Raid Marker"] = "Marcador de raide"
 L["Auras"]       = "Auras"
 L["Profiles"]    = "Perfis"
 L["About"]       = "Sobre"
+L["Changelog"]   = "Novidades"
 
 -- PROFILES
 L["Active profile"]                              = "Perfil ativo"
@@ -305,6 +306,7 @@ L["Raid target icon (skull, cross, star...) display."]                = "Exibe o
 L["Buffs and debuffs filtering, source, layout."]                     = "Filtros, origem e disposição de buffs/debuffs."
 L["Per-character profiles, import/export."]                           = "Perfis por personagem, importar/exportar."
 L["Version, links, slash commands."]                                  = "Versão, links e comandos slash."
+L["Release notes and recent changes."]                                = "Notas de versão e mudanças recentes."
 
 L["Click to select, then Ctrl+C to copy."]                                            = "Clique para selecionar e depois Ctrl+C para copiar."
 L["Export string for the active profile. Click Select All then Ctrl+C to copy."]     = "Cadeia de exportação do perfil ativo. Clique em Selecionar tudo e depois Ctrl+C."
