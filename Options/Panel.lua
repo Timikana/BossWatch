@@ -104,6 +104,12 @@ local function _registerInSection(widget, dbKey)
         widget._homeSection = _currentSection
         _currentSection.children[#_currentSection.children + 1] = widget
         if dbKey then _currentSection.dbKeys[#_currentSection.dbKeys + 1] = dbKey end
+        -- If the section was restored as collapsed BEFORE any children were
+        -- registered, the children would otherwise stay visible and bleed
+        -- over the next section's content. Hide newcomers immediately.
+        if _currentSection._collapsed and widget.Hide then
+            widget:Hide()
+        end
     end
 end
 
