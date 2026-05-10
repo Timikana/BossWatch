@@ -169,10 +169,13 @@ end
 -- frame is hidden.
 local function SmoothSetValue(bar, target)
     local db = BossW:GetDB()
-    if not db.smoothBars or type(target) ~= "number" then
+    -- Secret-tagged numbers are still type "number" but throw on arithmetic.
+    -- Bail to a direct SetValue (the StatusBar accepts secret values) and
+    -- skip interpolation entirely on those bosses.
+    if not db.smoothBars or type(target) ~= "number" or issecretvalue(target) then
         bar:SetScript("OnUpdate", nil)
         bar._smoothing = false
-        bar:SetValue(target or 0)
+        pcall(bar.SetValue, bar, target or 0)
         return
     end
     bar._smoothTarget = target
@@ -560,16 +563,25 @@ function BossW.UpdateRaidTargetIcon(frame)
     else
         idx = GetRaidTargetIndex(unit)
     end
-    if not idx or issecretvalue(idx) or idx == 0 then
+    if not idx then
         frame.raidTargetIcon:Hide()
         return
     end
-    if SetRaidTargetIconTexCoord then
-        SetRaidTargetIconTexCoord(frame.raidTargetIcon, idx)
-    elseif SetRaidTargetIconTexture then
-        SetRaidTargetIconTexture(frame.raidTargetIcon, idx)
+    -- Hostile bosses return a secret-tagged number (arithmetic throws), but
+    -- Blizzard's SetRaidTargetIconTexCoord C function still digests it.
+    -- For non-secret 0 (no marker), bail before drawing.
+    if not issecretvalue(idx) and idx == 0 then
+        frame.raidTargetIcon:Hide()
+        return
     end
-    frame.raidTargetIcon:Show()
+    local ok
+    if SetRaidTargetIconTexCoord then
+        ok = pcall(SetRaidTargetIconTexCoord, frame.raidTargetIcon, idx)
+    elseif SetRaidTargetIconTexture then
+        ok = pcall(SetRaidTargetIconTexture, frame.raidTargetIcon, idx)
+    end
+    if ok then frame.raidTargetIcon:Show()
+    else frame.raidTargetIcon:Hide() end
 end
 
 -- ============================================================
