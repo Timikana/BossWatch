@@ -1607,6 +1607,10 @@ local function buildChangelogPage(page)
 
     -- Per-version blocks. Each entry: { version, date, lines = { ... } }
     local entries = {
+        { ver = "v0.6.1", date = "2026-05-10", lines = {
+            L["Addon side tabs on the left edge of the panel: switch between BossWatch and TankWatch with one click (the second tab only appears when the sister addon is installed)."],
+            L["Modern look on the side tabs: dark glass backdrop, gold accent stripe on the active addon, glow ring on hover."],
+        }},
         { ver = "v0.6.0", date = "2026-05-10", lines = {
             L["Search bar (top-right) gathers matches from every tab onto a single Results page — Blizzard-style. Tabs show a (N) badge per hit count."],
             L["Collapsible sections with a refresh icon to reset just that section to defaults."],

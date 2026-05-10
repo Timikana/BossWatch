@@ -396,6 +396,8 @@ L["Enable modifier+click shortcuts on boss frames: Shift+Click cycles a raid mar
 -- Changelog tab
 L["Release notes and recent changes."] = "Notes de version et changements récents."
 L["Compatibility with WoW patch 12.0.7 (no more out-of-date warning)."] = "Compatibilité avec le patch WoW 12.0.7 (plus d'avertissement \"obsolète\")."
+L["Addon side tabs on the left edge of the panel: switch between BossWatch and TankWatch with one click (the second tab only appears when the sister addon is installed)."] = "Onglets d'addons à gauche du panneau : bascule entre BossWatch et TankWatch en un clic (le second onglet n'apparaît que si l'addon frère est installé)."
+L["Modern look on the side tabs: dark glass backdrop, gold accent stripe on the active addon, glow ring on hover."] = "Style moderne sur les onglets latéraux : fond verre sombre, liseré doré sur l'addon actif, halo doré au survol."
 L["Search bar (top-right) gathers matches from every tab onto a single Results page — Blizzard-style. Tabs show a (N) badge per hit count."] = "Barre de recherche (en haut à droite) qui rassemble les correspondances de tous les onglets sur une page Résultats — style Blizzard. Les onglets affichent un badge (N) selon le nombre de correspondances."
 L["Collapsible sections with a refresh icon to reset just that section to defaults."] = "Sections repliables avec une icône de rafraîchissement pour réinitialiser uniquement cette section."
 L["Resizable options window: drag the bottom-right grip; size and position saved account-wide. New 'Reset window size' button in About."] = "Fenêtre d'options redimensionnable : glisse le coin bas-droit ; taille et position sauvegardées pour tout le compte. Nouveau bouton « Réinitialiser la fenêtre » dans À propos."
