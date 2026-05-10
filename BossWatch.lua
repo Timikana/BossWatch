@@ -72,6 +72,12 @@ BW.Defaults = {
     showPowerText = true, powerTextAnchor = "RIGHT", powerTextX = -2, powerTextY = 0,
     powerTextFormat = "CURRENT",
 
+    -- Click actions on the boss frame (out-of-combat configurable)
+    clickActions = true,
+
+    -- Smooth health bar animation (interpolate between values instead of jumping)
+    smoothBars = true,
+
     -- Target highlight
     targetHighlight = true,
     targetHighlightColorMode = "STATIC", -- STATIC | CLASS | REACTION

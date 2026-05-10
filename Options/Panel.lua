@@ -7,6 +7,112 @@ local pairs, ipairs = pairs, ipairs
 local panel
 local refresh = function() if BW.RefreshAll then BW:RefreshAll() end end
 
+-- Forward-declare so that helpers defined earlier in the file (makeSection,
+-- factories) can capture the same local — otherwise Lua resolves the name
+-- as a global (nil), and tooltips silently never get attached.
+local addTooltip
+
+-- Module-level pointer used by widget factories to auto-register with the
+-- currently-being-built section. Each makeSection() updates this; each
+-- makeXxx() factory pushes itself onto _currentSection.children/dbKeys.
+local _currentSection = nil
+-- Chain of last-built section per page so makeSection() anchors its container
+-- under the previous section, which lets collapsing one section pull the rest
+-- of the page up.
+local _lastSectionOnPage = {}
+local _allSectionsOnPage = {}  -- [page] = { section1, section2, ... } in order
+
+local function _refreshHeightsForPage(parent)
+    local list = _allSectionsOnPage[parent]
+    if not list then return end
+    for _, s in ipairs(list) do
+        if not s._collapsed then s:UpdateNaturalHeight() end
+    end
+end
+
+-- Tab badge wiring populated by build()
+local _searchTabRefs = {}
+
+-- Forward declaration: the actual search implementation lives inside build()
+-- so it can close over `pages`, the results page, and `selectTab`. The search
+-- EditBox calls _applySearch() which delegates here.
+local _searchImpl = function() end
+local function _applySearch(q) return _searchImpl(q) end
+
+local function _captureAndReparent(widget, container, sectionOriginY)
+    -- Reparent the widget to the section container so it inherits visibility
+    -- (we still call Hide() on collapse for click-through reasons).
+    -- Convert page-relative anchors to container-relative so when the container
+    -- moves up after a previous section is collapsed, the widget moves with it.
+    -- We also stash _homeContainer + _homeAnchors so the search results page
+    -- can move the widget out and put it back later.
+    if not widget or not widget.GetPoint or not widget.SetPoint or not widget.SetParent then return end
+    local nPoints = widget.GetNumPoints and widget:GetNumPoints() or 0
+    if nPoints == 0 then return end
+    local pageRoot = container:GetParent()
+    -- Capture all points first (SetParent + ClearAllPoints will drop them)
+    local saved = {}
+    for i = 1, nPoints do
+        local p, relTo, relPoint, x, y = widget:GetPoint(i)
+        saved[i] = { p = p, relTo = relTo, relPoint = relPoint, x = x or 0, y = y or 0 }
+    end
+    widget:SetParent(container)
+    widget:ClearAllPoints()
+    widget._homeContainer = container
+    widget._homeAnchors = {}
+
+    -- Auto-flow: widgets that were originally placed in the right column
+    -- (x >= 240 in the 672-wide reference layout) get re-anchored to the
+    -- container's TOPRIGHT instead of TOPLEFT, preserving their original
+    -- right-edge offset. As the panel resizes wider, the right-column
+    -- widgets slide along with the right edge instead of leaving dead space.
+    local COL2_THRESHOLD = 240
+    local REFERENCE_W    = 672
+
+    for i, a in ipairs(saved) do
+        local newY    = a.y
+        local relTo   = a.relTo
+        local newP    = a.p
+        local newRP   = a.relPoint
+        local newX    = a.x
+        if a.relTo == pageRoot or a.relTo == nil then
+            relTo = container
+            newY  = a.y - sectionOriginY
+            -- Convert col2 page-relative anchors to TOPRIGHT-relative.
+            -- Skip FontStrings/Textures: their width is content-driven and
+            -- changes the anchor point ambiguously, which breaks chained
+            -- widgets (a dropdown body anchored to its label, etc.).
+            local oType   = (widget.GetObjectType and widget:GetObjectType()) or ""
+            local widgetW = (widget.GetWidth and widget:GetWidth()) or 0
+            local isFrame = oType ~= "FontString" and oType ~= "Texture"
+            if isFrame and a.x >= COL2_THRESHOLD and widgetW > 0 and a.p == "TOPLEFT" then
+                local rightMargin = REFERENCE_W - (a.x + widgetW)
+                if rightMargin < 4 then rightMargin = 4 end
+                newP  = "TOPRIGHT"
+                newRP = "TOPRIGHT"
+                newX  = -rightMargin
+            end
+        end
+        widget:SetPoint(newP, relTo, newRP, newX, newY)
+        widget._homeAnchors[i] = { p = newP, relTo = relTo, relPoint = newRP, x = newX, y = newY }
+    end
+end
+
+local function _registerInSection(widget, dbKey)
+    if _currentSection and widget then
+        _captureAndReparent(widget, _currentSection.container, _currentSection._originalY)
+        widget._homeSection = _currentSection
+        _currentSection.children[#_currentSection.children + 1] = widget
+        if dbKey then _currentSection.dbKeys[#_currentSection.dbKeys + 1] = dbKey end
+        -- If the section was restored as collapsed BEFORE any children were
+        -- registered, the children would otherwise stay visible and bleed
+        -- over the next section's content. Hide newcomers immediately.
+        if _currentSection._collapsed and widget.Hide then
+            widget:Hide()
+        end
+    end
+end
+
 -- ============================================================
 -- "NEW" BADGE
 -- ============================================================
@@ -113,6 +219,9 @@ local function makeSlider(parent, label, key, minV, maxV, step, x, y, width)
     end, sl)
 
     sl.refresh = function() sl:Init(readDB(), minV, maxV, numSteps, formatters) end
+    sl._searchText = label or ""
+    sl._searchGroup = { sl }
+    _registerInSection(sl, key)
     return sl
 end
 
@@ -127,20 +236,26 @@ local function makeCheck(parent, label, key, x, y)
         BW:GetDB()[key] = self:GetChecked() and true or false
         refresh()
     end)
+    cb._searchText = label or ""
+    cb._searchGroup = { cb }
+    _registerInSection(cb, key)
     return cb
 end
 
 local function makeDropdown(parent, label, key, options, x, y, width)
-    local labelFS = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    labelFS:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y)
-    labelFS:SetText(label)
-
-    -- Modern 11.0 dropdown (same template used by native Settings panels)
+    -- Modern 11.0 dropdown (same template used by native Settings panels).
+    -- The dropdown body is the anchor parent (so col2 auto-flow works) and
+    -- the label sits ABOVE it — visual position identical to the old layout
+    -- where the label was the parent.
     local dd = CreateFrame("DropdownButton", "BWOpt_DD_"..key, parent, "WowStyle1DropdownTemplate")
-    dd:SetPoint("TOPLEFT", labelFS, "BOTTOMLEFT", 0, -2)
     dd:SetWidth(width or 160)
+    dd:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y - 16)
     dd.dbKey = key
     dd._options = options
+
+    local labelFS = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    labelFS:SetPoint("BOTTOMLEFT", dd, "TOPLEFT", 0, 2)
+    labelFS:SetText(label)
 
     dd:SetupMenu(function(_, rootDescription)
         for _, opt in ipairs(options) do
@@ -153,6 +268,11 @@ local function makeDropdown(parent, label, key, options, x, y, width)
         end
     end)
     dd.refresh = function() dd:GenerateMenu() end
+    dd._labelFS = labelFS
+    dd._searchText = label or ""
+    dd._searchGroup = { dd, labelFS }  -- dd is the leader (auto-flow target)
+    _registerInSection(dd, key)
+    _registerInSection(labelFS)
     return dd
 end
 
@@ -165,14 +285,15 @@ local function makeMediaDropdown(parent, label, key, mediaType, x, y, width, tin
     local TR, TG, TB = 1, 1, 1
     if tint then TR, TG, TB = tint[1] or 1, tint[2] or 1, tint[3] or 1 end
 
-    local labelFS = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    labelFS:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y)
-    labelFS:SetText(label)
-
-    -- Anchor button (acts as the dropdown header) — modern dark style
+    -- Anchor button (acts as the dropdown header) — modern dark style.
+    -- btn is the anchor parent so col2 auto-flow works; labelFS sits above it.
     local btn = CreateFrame("Button", nil, parent, "BackdropTemplate")
     btn:SetSize(width, 24)
-    btn:SetPoint("TOPLEFT", labelFS, "BOTTOMLEFT", 0, -4)
+    btn:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y - 18)
+
+    local labelFS = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    labelFS:SetPoint("BOTTOMLEFT", btn, "TOPLEFT", 0, 4)
+    labelFS:SetText(label)
     btn:SetBackdrop({
         bgFile   = "Interface\\Buttons\\WHITE8x8",
         edgeFile = "Interface\\Buttons\\WHITE8x8",
@@ -357,26 +478,35 @@ local function makeMediaDropdown(parent, label, key, mediaType, x, y, width, tin
         applyPreview(cur)
     end
     btn.refresh()
+    -- Register all the sibling regions of the media dropdown so that collapsing
+    -- the section hides the label and the preview as well, not just the button.
+    btn._searchText = label or ""
+    btn._searchGroup = { btn, labelFS, previewBg, previewBorder, (previewTex or previewText) }
+    _registerInSection(btn, key)
+    _registerInSection(labelFS)
+    _registerInSection(previewBg)
+    _registerInSection(previewBorder)
+    if previewTex then _registerInSection(previewTex) end
+    if previewText then _registerInSection(previewText) end
     return btn
 end
 
 local function makeColorPicker(parent, label, dbKey, x, y)
     local lab
-    if label and label ~= "" then
-        lab = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        lab:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y)
-        lab:SetText(label)
-    end
-
-    -- Modern compact swatch button: gold thin border + inner color swatch
+    -- Modern compact swatch button: gold thin border + inner color swatch.
+    -- btn is the anchor parent; the optional label sits above it. This way
+    -- col2 colorpickers participate in auto-flow.
     local btn = CreateFrame("Button", nil, parent)
     btn:SetSize(28, 22)
-    if lab then
-        btn:SetPoint("TOPLEFT", lab, "BOTTOMLEFT", 0, -2)
-    else
-        btn:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y)
-    end
+    local hasLabel = label and label ~= ""
+    btn:SetPoint("TOPLEFT", parent, "TOPLEFT", x, hasLabel and (y - 16) or y)
     btn:RegisterForClicks("AnyUp")
+
+    if hasLabel then
+        lab = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        lab:SetPoint("BOTTOMLEFT", btn, "TOPLEFT", 0, 2)
+        lab:SetText(label)
+    end
 
     local border = btn:CreateTexture(nil, "BACKGROUND")
     border:SetAllPoints(btn)
@@ -459,6 +589,11 @@ local function makeColorPicker(parent, label, dbKey, x, y)
         end
     end)
 
+    btn.dbKey = dbKey
+    btn._searchText = label or ""
+    btn._searchGroup = lab and { btn, lab } or { btn }
+    _registerInSection(btn, dbKey)
+    if lab then _registerInSection(lab) end
     return btn
 end
 
@@ -469,31 +604,185 @@ end
 -- Solution: defer positioning by one tick, then anchor both endpoints to
 -- parent:TOPLEFT / parent:TOPRIGHT at the exact same y, with the line's left
 -- offset computed from the actual rendered header width.
-local function makeSection(parent, title, x, y)
-    local header = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    header:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y)
-    header:SetText(title)
-    header:SetTextColor(1, 0.82, 0)
+-- Helper: shallow-deep copy a value so default tables (e.g. color = {r,g,b,a})
+-- aren't shared between profiles when reset.
+local function _cloneDefault(v)
+    if type(v) ~= "table" then return v end
+    local out = {}
+    for k, val in pairs(v) do out[k] = _cloneDefault(val) end
+    return out
+end
 
-    local line = parent:CreateTexture(nil, "OVERLAY")
+local SECTION_GAP = 28  -- vertical pixels between section containers
+local COLLAPSED_HEIGHT = 22
+
+local function makeSection(parent, title, x, y, key)
+    local section = {
+        children = {},
+        dbKeys = {},
+        key = key,
+        _originalY = y,
+        _parent = parent,
+    }
+
+    -- Container frame: chains under the previous section on this page.
+    -- Collapsing one container shrinks it, which automatically pulls every
+    -- subsequent section up the page.
+    local container = CreateFrame("Frame", nil, parent)
+    local prev = _lastSectionOnPage[parent]
+    if prev then
+        container:SetPoint("TOPLEFT",  prev.container, "BOTTOMLEFT", 0, -SECTION_GAP)
+        container:SetPoint("TOPRIGHT", parent,         "TOPRIGHT",   0, 0)
+    else
+        -- First section on the page anchors at the requested y offset.
+        container:SetPoint("TOPLEFT",  parent, "TOPLEFT",  0, y)
+        container:SetPoint("TOPRIGHT", parent, "TOPRIGHT", 0, y)
+    end
+    container:SetHeight(COLLAPSED_HEIGHT)
+    section.container = container
+    section._searchText = (title or ""):lower()
+    _lastSectionOnPage[parent] = section
+    _allSectionsOnPage[parent] = _allSectionsOnPage[parent] or {}
+    _allSectionsOnPage[parent][#_allSectionsOnPage[parent] + 1] = section
+
+    -- Header inside the container at (x, 0)
+    local header = container:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    header:SetPoint("TOPLEFT", container, "TOPLEFT", x, 0)
+    header:SetTextColor(1, 0.82, 0)
+    header:SetText(title)
+    section.header = header
+
+    -- Chevron (collapsed indicator) — Blizzard PlusMinus textures
+    local chevron = container:CreateTexture(nil, "OVERLAY")
+    chevron:SetSize(14, 14)
+    chevron:SetPoint("LEFT", header, "RIGHT", 4, -1)
+    section.chevron = chevron
+    local TEX_EXPANDED  = "Interface\\Buttons\\UI-MinusButton-Up"
+    local TEX_COLLAPSED = "Interface\\Buttons\\UI-PlusButton-Up"
+
+    -- Invisible click area covering the header strip
+    local clickArea = CreateFrame("Button", nil, container)
+    clickArea:SetPoint("TOPLEFT",  container, "TOPLEFT",  x - 14, -2)
+    clickArea:SetPoint("TOPRIGHT", container, "TOPRIGHT", -40,    -2)
+    clickArea:SetHeight(18)
+    clickArea:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    section.clickArea = clickArea
+
+    -- Reset section button (refresh icon, same pattern as TankWatch)
+    local btnReset = CreateFrame("Button", nil, container)
+    btnReset:SetSize(14, 14)
+    btnReset:SetPoint("TOPRIGHT", container, "TOPRIGHT", -14, -1)
+    btnReset:SetNormalTexture("Interface\\Buttons\\UI-RefreshButton")
+    btnReset:GetNormalTexture():SetTexCoord(0.05, 0.95, 0.05, 0.95)
+    btnReset:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight", "ADD")
+    section.resetBtn = btnReset
+
+    local line = container:CreateTexture(nil, "OVERLAY")
     line:SetHeight(1)
     line:SetColorTexture(1, 0.82, 0, 0.55)
+    section.line = line
 
-    local function place()
-        local w = header:GetStringWidth() or 0
+    local function placeLine()
+        local hw = header:GetStringWidth() or 0
+        local startX = x + hw + 4 + 14 + 8
         line:ClearAllPoints()
-        line:SetPoint("TOPLEFT",  parent, "TOPLEFT",  x + w + 10, y - 7)
-        line:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -14,        y - 7)
+        line:SetPoint("TOPLEFT",  container, "TOPLEFT",  startX, -7)
+        line:SetPoint("TOPRIGHT", container, "TOPRIGHT", -42,    -7)
     end
-    place()
-    C_Timer.After(0, place)  -- re-run once layout pass has computed string width
-    return header
+    placeLine()
+    C_Timer.After(0, placeLine)
+
+    function section:UpdateNaturalHeight()
+        if self._collapsed then
+            self.container:SetHeight(COLLAPSED_HEIGHT)
+            return
+        end
+        local cTop = self.container:GetTop()
+        if not cTop then
+            C_Timer.After(0, function() self:UpdateNaturalHeight() end)
+            return
+        end
+        local lowest, gotAnyChildPos = cTop, false
+        for _, w in ipairs(self.children) do
+            if w.IsShown and w:IsShown() and w.GetBottom then
+                local b = w:GetBottom()
+                if b then
+                    gotAnyChildPos = true
+                    if b < lowest then lowest = b end
+                end
+            end
+        end
+        -- If we have children but none have a resolved bottom yet, defer.
+        -- Otherwise the container shrinks to COLLAPSED_HEIGHT, the next section
+        -- anchors right under it, and you get a stack of overlapping rows.
+        if not gotAnyChildPos and #self.children > 0 then
+            C_Timer.After(0, function() self:UpdateNaturalHeight() end)
+            return
+        end
+        local span = math.max(COLLAPSED_HEIGHT, cTop - lowest + 8)
+        self.container:SetHeight(span)
+    end
+
+    function section:SetCollapsed(state, persist)
+        state = state and true or false
+        for _, w in ipairs(self.children) do
+            if state then if w.Hide then w:Hide() end
+            else            if w.Show then w:Show() end end
+        end
+        chevron:SetTexture(state and TEX_COLLAPSED or TEX_EXPANDED)
+        if persist and self.key then
+            BossWatchDB = BossWatchDB or {}
+            BossWatchDB.collapsedSections = BossWatchDB.collapsedSections or {}
+            BossWatchDB.collapsedSections[self.key] = state or nil
+        end
+        self._collapsed = state
+        if state then
+            self.container:SetHeight(COLLAPSED_HEIGHT)
+        else
+            self:UpdateNaturalHeight()
+        end
+    end
+
+    function section:Toggle()
+        self:SetCollapsed(not self._collapsed, true)
+    end
+
+    function section:ResetToDefaults()
+        local db = BW:GetDB()
+        for _, k in ipairs(self.dbKeys) do
+            local def = (BW.Defaults or {})[k]
+            if def ~= nil then db[k] = _cloneDefault(def) end
+        end
+        if BW.RefreshAll then BW:RefreshAll() end
+        if BW.ApplyFonts then BW:ApplyFonts() end
+        if panel and panel.refreshAll then panel.refreshAll() end
+    end
+
+    clickArea:SetScript("OnClick", function() section:Toggle() end)
+    btnReset:SetScript("OnClick", function() section:ResetToDefaults() end)
+
+    -- Restore collapsed state from DB
+    BossWatchDB = BossWatchDB or {}
+    local restored = BossWatchDB.collapsedSections and key and BossWatchDB.collapsedSections[key]
+    section:SetCollapsed(restored or false, false)
+
+    -- Tooltips
+    if addTooltip then
+        addTooltip(clickArea, L["Click to collapse/expand this section."])
+        addTooltip(btnReset,  L["Reset this section to default values."])
+    end
+
+    -- Subsequent makeXxx() / _registerInSection() calls will attach to this section.
+    _currentSection = section
+    return section
 end
 
 -- Hover tooltip helper. Hooks the widget AND any well-known child controls
 -- (slider thumb, steppers) so the tooltip shows everywhere on composite widgets.
-local function addTooltip(widget, text)
+addTooltip = function(widget, text)
     if not widget or not text or text == "" then return widget end
+    -- Index for the search bar (label + tooltip body, lower-cased once at build time)
+    widget._searchText = ((widget._searchText or "") .. " " .. text):lower()
     local function show(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         GameTooltip:AddLine(text, 1, 1, 1, true)
@@ -542,6 +831,7 @@ local TAB_TOOLTIPS = {
     auras    = L["Buffs and debuffs filtering, source, layout."],
     profiles = L["Per-character profiles, import/export."],
     about    = L["Version, links, slash commands."],
+    changelog= L["Release notes and recent changes."],
 }
 
 local function makeTab(parent, id, label, idx, prevTab)
@@ -568,17 +858,19 @@ local function buildLayoutPage(page)
     local y = -8
 
     -- ============ ACTIONS ============
-    makeSection(page, L["Actions"], 14, y); y = y - 22
+    makeSection(page, L["Actions"], 14, y, "layout.actions"); y = y - 22
 
     local btnMover = CreateFrame("Button", nil, page, "UIPanelButtonTemplate")
     btnMover:SetSize(160, 22); btnMover:SetPoint("TOPLEFT", 14, y)
     btnMover:SetText(L["Unlock / Lock Mover"])
     btnMover:SetScript("OnClick", function() BW:ToggleMover() end)
     addTooltip(btnMover, L["Toggle a draggable handle on the boss frames container so you can move it on screen."])
+    _registerInSection(btnMover)
 
     local label = page:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     label:SetPoint("TOPLEFT", 184, y - 4)
     label:SetText(L["Test:"])
+    _registerInSection(label)
 
     local function currentTestCount()
         local n = 0
@@ -607,13 +899,14 @@ local function buildLayoutPage(page)
         addTooltip(b, count == 0 and L["Stop the simulation."]
             or format(L["Simulate %d boss frame(s) with fake HP, casts and auras."], count))
         testBtns[#testBtns + 1] = b
+        _registerInSection(b)
         xs = xs + 38
     end
     refreshTestBtns()
 
     -- ============ GENERAL ============
     y = y - 36
-    makeSection(page, L["General"], 14, y); y = y - 24
+    makeSection(page, L["General"], 14, y, "layout.general"); y = y - 24
 
     addTooltip(makeCheck(page, L["Enable"], "enabled", 14, y),
         L["Master switch for the addon. When off, BossWatch frames stay hidden."])
@@ -634,10 +927,15 @@ local function buildLayoutPage(page)
         cbMini:SetChecked(BossWatchDB and BossWatchDB.minimap and not BossWatchDB.minimap.hide)
     end
     addTooltip(cbMini, L["Show a minimap button to open the options. Left-click: options, right-click: toggle mover."])
+    _registerInSection(cbMini)
+
+    y = y - 30
+    addTooltip(markAsNew(makeCheck(page, L["Click actions on boss frames"], "clickActions", 14, y), "clickActions"),
+        L["Enable modifier+click shortcuts on boss frames: Shift+Click cycles a raid marker, Ctrl+Click sets focus."])
 
     -- ============ LAYOUT STYLE ============
     y = y - 60
-    makeSection(page, L["Layout style"], 14, y); y = y - 24
+    makeSection(page, L["Layout style"], 14, y, "layout.style"); y = y - 24
 
     addTooltip(markAsNew(makeDropdown(page, L["Layout"], "layoutBlocks", {
         { text = L["3 blocks (compact)"],     value = 3 },
@@ -655,7 +953,7 @@ local function buildLayoutPage(page)
 
     -- ============ POSITION ============
     y = y - 60
-    makeSection(page, L["Position"], 14, y); y = y - 24
+    makeSection(page, L["Position"], 14, y, "layout.position"); y = y - 24
 
     addTooltip(makeDropdown(page, L["Anchor"], "anchor", ANCHOR9(), 14, y),
         L["Anchor point on the screen used as origin for the X/Y offsets."])
@@ -670,7 +968,7 @@ local function buildLayoutPage(page)
 
     -- ============ DIMENSIONS ============
     y = y - 60
-    makeSection(page, L["Dimensions"], 14, y); y = y - 24
+    makeSection(page, L["Dimensions"], 14, y, "layout.dimensions"); y = y - 24
 
     addTooltip(makeSlider(page, L["Width"],  "frameWidth",  100, 400, 1, 14, y),
         L["Width of each boss frame in pixels."])
@@ -684,7 +982,7 @@ local function buildLayoutPage(page)
 
     -- ============ TARGET HIGHLIGHT ============
     y = y - 60
-    makeSection(page, L["Target Highlight"], 14, y); y = y - 24
+    makeSection(page, L["Target Highlight"], 14, y, "layout.targetHL"); y = y - 24
 
     addTooltip(markAsNew(makeCheck(page, L["Highlight current target"], "targetHighlight", 14, y), "targetHighlight"),
         L["Add a colored border around the boss frame matching your current target."])
@@ -708,7 +1006,7 @@ local function buildBarsPage(page)
     local y = -8
 
     -- ============ HEALTH ============
-    makeSection(page, L["Health"], 14, y); y = y - 24
+    makeSection(page, L["Health"], 14, y, "bars.health"); y = y - 24
     addTooltip(makeMediaDropdown(page, L["Health Texture"], "healthTexture", "statusbar", 14, y, 180, {0.9, 0.2, 0.2}),
         L["Status bar texture used for the boss health bar."])
     y = y - 50
@@ -722,10 +1020,12 @@ local function buildBarsPage(page)
     y = y - 56
     addTooltip(makeSlider(page, L["HP background alpha"], "healthBackgroundAlpha", 0, 1, 0.05, 14, y),
         L["Opacity of the empty (un-filled) part of the health bar."])
+    addTooltip(markAsNew(makeCheck(page, L["Smooth bar animation"], "smoothBars", 260, y), "smoothBars"),
+        L["Animate the health bar between values instead of jumping. Disable for instant updates."])
 
     -- ============ POWER ============
     y = y - 60
-    makeSection(page, L["Power"], 14, y); y = y - 24
+    makeSection(page, L["Power"], 14, y, "bars.power"); y = y - 24
     addTooltip(makeCheck(page, L["Show Power Bar"], "showPowerBar", 14, y),
         L["Display the power bar below the health bar."])
     y = y - 30
@@ -739,7 +1039,7 @@ local function buildBarsPage(page)
 
     -- ============ ABSORBS ============
     y = y - 60
-    makeSection(page, L["Absorbs"] .. " |cffff4040(" .. (L["Experimental"] or "Experimental") .. ")|r", 14, y); y = y - 24
+    makeSection(page, L["Absorbs"] .. " |cffff4040(" .. (L["Experimental"] or "Experimental") .. ")|r", 14, y, "bars.absorbs"); y = y - 24
     addTooltip(markAsNew(makeCheck(page, L["Show absorbs / shields"], "showAbsorbs", 14, y), "showAbsorbs"),
         L["Display incoming damage absorbs (shields, bubbles) as a translucent overlay extending the health bar. May not show on bosses with secret-tagged values."])
     addTooltip(markAsNew(makeColorPicker(page, L["Absorb color"], "absorbColor", 280, y), "absorbColor"),
@@ -750,7 +1050,7 @@ local function buildBarsPage(page)
 
     -- ============ BACKGROUND ============
     y = y - 60
-    makeSection(page, L["Background"], 14, y); y = y - 24
+    makeSection(page, L["Background"], 14, y, "bars.background"); y = y - 24
     addTooltip(markAsNew(makeMediaDropdown(page, L["Background Texture"], "barBackgroundTexture", "statusbar", 14, y, 180), "barBackgroundTexture"),
         L["Texture used behind the bars (the empty / dark portion)."])
     y = y - 50
@@ -766,7 +1066,7 @@ local function buildCastPage(page)
     local y = -8
 
     -- ============ DISPLAY ============
-    makeSection(page, L["Display"], 14, y); y = y - 24
+    makeSection(page, L["Display"], 14, y, "cast.display"); y = y - 24
     addTooltip(makeCheck(page, L["Show Cast Bar"], "showCastBar", 14, y),
         L["Show a cast bar under the boss frame when it's casting."])
     addTooltip(makeCheck(page, L["Detached"], "castBarDetached", 184, y),
@@ -782,14 +1082,14 @@ local function buildCastPage(page)
 
     -- ============ SPELL ICON ============
     y = y - 60
-    makeSection(page, L["Spell Icon"], 14, y); y = y - 24
+    makeSection(page, L["Spell Icon"], 14, y, "cast.spellicon"); y = y - 24
     addTooltip(makeDropdown(page, L["Icon Position"], "castBarIconPosition", {
         { text = L["Left"], value = "LEFT" }, { text = L["Right"], value = "RIGHT" },
     }, 14, y), L["Side of the cast bar where the spell icon is shown."])
 
     -- ============ DETACHED POSITION ============
     y = y - 60
-    makeSection(page, L["Detached Position"], 14, y); y = y - 24
+    makeSection(page, L["Detached Position"], 14, y, "cast.detached"); y = y - 24
     addTooltip(makeDropdown(page, L["Detached Anchor"], "castBarDetachedAnchor", ANCHOR9(), 14, y),
         L["Screen anchor used as origin when the cast bar is detached."])
     addTooltip(makeSlider(page, L["Detached Width (0=auto)"], "castBarDetachedWidth", 0, 400, 1, 260, y),
@@ -812,7 +1112,7 @@ local function buildTextPage(page)
     }
 
     -- ============ NAME ============
-    makeSection(page, L["Name"], 14, y); y = y - 24
+    makeSection(page, L["Name"], 14, y, "text.name"); y = y - 24
     addTooltip(makeCheck(page, L["Show Name"], "showName", 14, y),
         L["Show the boss name on the frame."])
     addTooltip(makeDropdown(page, L["Name Position"], "nameAnchor", ANCHOR9(), 184, y),
@@ -828,7 +1128,7 @@ local function buildTextPage(page)
 
     -- ============ HEALTH TEXT ============
     y = y - 60
-    makeSection(page, L["Health Text"], 14, y); y = y - 24
+    makeSection(page, L["Health Text"], 14, y, "text.health"); y = y - 24
     addTooltip(makeCheck(page, L["Show Health Text"], "showHealthText", 14, y),
         L["Display HP value as text on the health bar."])
     addTooltip(makeDropdown(page, L["HP text position"], "healthTextAnchor", ANCHOR9(), 184, y),
@@ -844,7 +1144,7 @@ local function buildTextPage(page)
 
     -- ============ POWER TEXT ============
     y = y - 60
-    makeSection(page, L["Power Text"], 14, y); y = y - 24
+    makeSection(page, L["Power Text"], 14, y, "text.power"); y = y - 24
     addTooltip(makeCheck(page, L["Show Power Text"], "showPowerText", 14, y),
         L["Display power value as text on the power bar."])
     -- Power on hostile bosses returns secret-tagged values: arithmetic and
@@ -859,7 +1159,7 @@ local function buildTextPage(page)
 
     -- ============ FONT ============
     y = y - 60
-    makeSection(page, L["Font (applies to all text)"], 14, y); y = y - 24
+    makeSection(page, L["Font (applies to all text)"], 14, y, "text.font"); y = y - 24
     addTooltip(makeMediaDropdown(page, L["Font"], "fontFace", "font", 14, y, 180),
         L["Font used for every text on the boss frames."])
     y = y - 56
@@ -876,7 +1176,7 @@ end
 local function buildRaidMarkerPage(page)
     local y = -8
 
-    makeSection(page, L["Raid Target Icon"], 14, y); y = y - 24
+    makeSection(page, L["Raid Target Icon"], 14, y, "raid.icon"); y = y - 24
 
     local note = page:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     note:SetPoint("TOPLEFT", 14, y)
@@ -905,7 +1205,7 @@ local function buildAurasPage(page)
     local y = -8
 
     -- ============ FILTER ============
-    makeSection(page, L["Filter"], 14, y); y = y - 24
+    makeSection(page, L["Filter"], 14, y, "auras.filter"); y = y - 24
     addTooltip(makeCheck(page, L["Show Auras"], "showAuras", 14, y),
         L["Show buffs or debuffs on the boss frame."])
     addTooltip(makeDropdown(page, L["Filter"], "aurasFilter", {
@@ -922,7 +1222,7 @@ local function buildAurasPage(page)
 
     -- ============ SIZE ============
     y = y - 60
-    makeSection(page, L["Size"], 14, y); y = y - 24
+    makeSection(page, L["Size"], 14, y, "auras.size"); y = y - 24
     addTooltip(makeSlider(page, L["Max Count"], "aurasMaxCount", 1, 8, 1, 14, y),
         L["Maximum number of aura icons displayed per frame."])
     addTooltip(makeSlider(page, L["Size"], "aurasSize", 12, 48, 1, 260, y),
@@ -933,7 +1233,7 @@ local function buildAurasPage(page)
 
     -- ============ LAYOUT ============
     y = y - 60
-    makeSection(page, L["Layout"], 14, y); y = y - 24
+    makeSection(page, L["Layout"], 14, y, "auras.layout"); y = y - 24
     addTooltip(makeDropdown(page, L["Anchor"], "aurasAnchor", ANCHOR9(), 14, y),
         L["Where the aura row attaches on the boss frame."])
     addTooltip(makeDropdown(page, L["Grow X"], "aurasGrowX", {
@@ -948,7 +1248,7 @@ local function buildAurasPage(page)
 
     -- ============ DISPLAY ============
     y = y - 60
-    makeSection(page, L["Display"], 14, y); y = y - 24
+    makeSection(page, L["Display"], 14, y, "auras.display"); y = y - 24
     addTooltip(makeCheck(page, L["Show Stacks"], "aurasShowStacks", 14, y),
         L["Display aura stack count when applicable."])
     addTooltip(makeCheck(page, L["Show Timer"],  "aurasShowTimer",  184, y),
@@ -993,6 +1293,7 @@ local function showConfirmPopup(text, onAccept)
 end
 
 local function buildProfilesPage(page)
+    _currentSection = nil  -- this page has no makeSection — widgets shouldn't register
     local y = -10
 
     -- Character label
@@ -1187,6 +1488,7 @@ local function buildProfilesPage(page)
 end
 
 local function buildAboutPage(page)
+    _currentSection = nil  -- this page has no makeSection — widgets shouldn't register
     local version = C_AddOns and C_AddOns.GetAddOnMetadata(addonName, "Version") or "?"
     local author  = C_AddOns and C_AddOns.GetAddOnMetadata(addonName, "Author")  or "Timikana"
 
@@ -1261,6 +1563,23 @@ local function buildAboutPage(page)
     end, alphaSlider)
     addTooltip(alphaSlider, L["Opacity of this options window. Saved account-wide."])
 
+    -- Reset window size/position button (account-wide)
+    local btnResetWin = CreateFrame("Button", nil, page, "UIPanelButtonTemplate")
+    btnResetWin:SetSize(160, 22)
+    btnResetWin:SetPoint("TOPLEFT", page, "TOPLEFT", 260, -440)
+    btnResetWin:SetText(L["Reset window size"])
+    btnResetWin:SetScript("OnClick", function()
+        BossWatchDB.panelW = nil
+        BossWatchDB.panelH = nil
+        BossWatchDB.panelPoint = nil
+        if panel then
+            panel:SetSize(720, 620)
+            panel:ClearAllPoints()
+            panel:SetPoint("CENTER")
+        end
+    end)
+    addTooltip(btnResetWin, L["Reset the options window to its default size and position."])
+
     local cmdHeader = page:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     cmdHeader:SetPoint("TOPLEFT", 14, -500)
     cmdHeader:SetText(L["Slash commands"])
@@ -1283,6 +1602,83 @@ local function buildAboutPage(page)
     hint:SetText(L["Click a URL to select it, then Ctrl+C to copy."])
 end
 
+local function buildChangelogPage(page)
+    _currentSection = nil  -- raw content, no sections
+
+    -- Per-version blocks. Each entry: { version, date, lines = { ... } }
+    local entries = {
+        { ver = "v0.6.0", date = "2026-05-10", lines = {
+            L["Search bar (top-right) gathers matches from every tab onto a single Results page — Blizzard-style. Tabs show a (N) badge per hit count."],
+            L["Collapsible sections with a refresh icon to reset just that section to defaults."],
+            L["Resizable options window: drag the bottom-right grip; size and position saved account-wide. New 'Reset window size' button in About."],
+            L["Auto-flow: right-column controls (sliders, checks, dropdowns, color pickers) slide along the right edge when the panel is widened."],
+            L["Click actions on boss frames: Shift+Click cycles raid markers, Ctrl+Click sets focus. Toggle in Layout > General."],
+            L["Smooth health bar animation (toggle in Bars > Health)."],
+            L["This Changelog tab so you can see what changed without leaving the game."],
+            L["Lots of small UX polish: section dividers stretch with the panel width, dropdown labels stay anchored above their control, more tooltips, etc."],
+        }},
+        { ver = "v0.5.1", date = "2026-05-10", lines = {
+            L["Compatibility with WoW patch 12.0.7 (no more out-of-date warning)."],
+        }},
+        { ver = "v0.5.0", date = "2026-05-10", lines = {
+            L["Damage absorption / shields are now drawn over the boss health bar."],
+            L["Modernized options panel using the WoW 11/12 portrait style."],
+            L["Highlight border around the boss frame matching your current target (with optional pulse)."],
+            L["3-block (compact) or 4-block (name on its own row) layout."],
+            L["Themed test mode: Lich King, Kel'Thuzad, Onyxia, Ragnaros, Illidan."],
+            L["Full localization: French, German, Spanish, Italian, Brazilian Portuguese."],
+            L["Tooltips on every control, including the bottom tabs."],
+            L["Search bar (top-right of the panel) gathers matches from every tab onto a Results page — Blizzard-style."],
+            L["Collapsible sections with a per-section reset button (refresh icon)."],
+            L["Resizable options window: drag the bottom-right grip; size and position are saved account-wide."],
+            L["Auto-flow: right-column controls slide along with the right edge when the panel is widened."],
+            L["Click actions on boss frames: Shift+Click cycles raid markers, Ctrl+Click sets focus."],
+            L["Smooth health bar animation."],
+        }},
+        { ver = "v0.4.x", date = "2026-04", lines = {
+            L["Modern UI portrait frame, scrollable LSM media dropdowns with previews."],
+            L["Profile import/export with overwrite confirmation."],
+            L["Polished defaults for textures and font, fixed bugs around HP/Power text on hostile bosses."],
+        }},
+        { ver = "v0.3.x", date = "2026-03", lines = {
+            L["Frame background controls and target highlight color modes."],
+            L["German, Spanish, Italian and Brazilian Portuguese locale stubs."],
+        }},
+        { ver = "v0.2.0", date = "2026-02", lines = {
+            L["Profile system, minimap icon, target highlight, color pickers."],
+        }},
+        { ver = "v0.1.0", date = "2026-01", lines = {
+            L["Initial release: custom boss target frames extracted from DandersFrames."],
+        }},
+    }
+
+    local y = -10
+    for _, entry in ipairs(entries) do
+        local title = page:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+        title:SetPoint("TOPLEFT", 14, y)
+        title:SetText("|cffeda14a" .. entry.ver .. "|r  |cff888888" .. entry.date .. "|r")
+        y = y - 22
+
+        for _, line in ipairs(entry.lines) do
+            local fs = page:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+            fs:SetPoint("TOPLEFT", 24, y)
+            fs:SetWidth(620)
+            fs:SetJustifyH("LEFT")
+            fs:SetSpacing(2)
+            fs:SetText("• " .. line)
+            -- GetStringHeight needs a layout pass; estimate generously per line
+            -- so very long entries don't overlap. C_Timer fix-up could refine.
+            local lines = math.max(1, math.ceil(#line / 90))
+            y = y - (lines * 16 + 4)
+        end
+        y = y - 14
+    end
+
+    local hint = page:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    hint:SetPoint("TOPLEFT", 14, y - 6)
+    hint:SetText(L["Full GitHub history: https://github.com/Timikana/BossWatch/releases"])
+end
+
 -- ============================================================
 -- BUILD
 -- ============================================================
@@ -1290,15 +1686,52 @@ end
 local function build()
     -- Modern Blizzard 11.0 portrait frame (used by Item Upgrades, Adventure Guide, etc.)
     panel = CreateFrame("Frame", "BossWatchOptions", UIParent, "PortraitFrameTemplate")
-    panel:SetSize(720, 620)
-    panel:SetPoint("CENTER")
+    BossWatchDB = BossWatchDB or {}
+    local startW = math.max(720, BossWatchDB.panelW or 720)
+    local startH = math.max(500, BossWatchDB.panelH or 620)
+    panel:SetSize(startW, startH)
+    if BossWatchDB.panelPoint then
+        local p = BossWatchDB.panelPoint
+        panel:ClearAllPoints()
+        panel:SetPoint(p.point or "CENTER", UIParent, p.relPoint or "CENTER", p.x or 0, p.y or 0)
+    else
+        panel:SetPoint("CENTER")
+    end
     panel:SetMovable(true); panel:EnableMouse(true)
     panel:RegisterForDrag("LeftButton")
     panel:SetScript("OnDragStart", panel.StartMoving)
-    panel:SetScript("OnDragStop", panel.StopMovingOrSizing)
+    panel:SetScript("OnDragStop", function(self)
+        self:StopMovingOrSizing()
+        local point, _, relPoint, x, y = self:GetPoint(1)
+        BossWatchDB.panelPoint = { point = point, relPoint = relPoint,
+                                   x = math.floor((x or 0) + 0.5),
+                                   y = math.floor((y or 0) + 0.5) }
+    end)
     panel:SetFrameStrata("HIGH")
     panel:Hide()
     panel:SetClampedToScreen(true)
+    panel:SetResizable(true)
+    if panel.SetResizeBounds then
+        panel:SetResizeBounds(720, 500, 1400, 1100)
+    end
+
+    -- Resize grip (bottom-right)
+    local grip = CreateFrame("Button", nil, panel)
+    grip:SetSize(16, 16)
+    grip:SetPoint("BOTTOMRIGHT", -4, 4)
+    grip:SetFrameLevel(panel:GetFrameLevel() + 10)
+    grip:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
+    grip:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
+    grip:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
+    grip:SetScript("OnMouseDown", function(_, btn)
+        if btn == "LeftButton" then panel:StartSizing("BOTTOMRIGHT") end
+    end)
+    grip:SetScript("OnMouseUp", function()
+        panel:StopMovingOrSizing()
+        BossWatchDB.panelW = math.floor(panel:GetWidth() + 0.5)
+        BossWatchDB.panelH = math.floor(panel:GetHeight() + 0.5)
+    end)
+    addTooltip(grip, L["Drag to resize the options window. Saved account-wide."])
     -- Close on Escape (Blizzard's UI special-frames list)
     tinsert(UISpecialFrames, "BossWatchOptions")
 
@@ -1319,6 +1752,43 @@ local function build()
         panel:SetPortraitToAsset("Interface\\AddOns\\BossWatch\\Media\\logo.png")
     end
 
+    -- Search bar (top-right of the title area)
+    local searchBox = CreateFrame("EditBox", "BWOpt_Search", panel, "InputBoxTemplate")
+    searchBox:SetSize(200, 22)
+    searchBox:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -38, -32)
+    searchBox:SetAutoFocus(false)
+    searchBox:SetMaxLetters(40)
+    searchBox:SetFontObject("GameFontHighlight")
+    searchBox:SetTextInsets(20, 18, 0, 0)
+
+    local searchIcon = searchBox:CreateTexture(nil, "OVERLAY")
+    searchIcon:SetTexture("Interface\\Common\\UI-Searchbox-Icon")
+    searchIcon:SetSize(14, 14)
+    searchIcon:SetPoint("LEFT", searchBox, "LEFT", 4, 0)
+
+    local searchPlaceholder = searchBox:CreateFontString(nil, "OVERLAY", "GameFontDisable")
+    searchPlaceholder:SetPoint("LEFT", searchIcon, "RIGHT", 4, 0)
+    searchPlaceholder:SetText(L["Search options…"])
+
+    local searchClear = CreateFrame("Button", nil, searchBox)
+    searchClear:SetSize(16, 16)
+    searchClear:SetPoint("RIGHT", searchBox, "RIGHT", -2, 0)
+    searchClear:SetNormalTexture("Interface\\Buttons\\UI-StopButton")
+    searchClear:Hide()
+
+    local function runSearch(text)
+        searchPlaceholder:SetShown(text == "")
+        searchClear:SetShown(text ~= "")
+        _applySearch(text)
+    end
+
+    searchBox:SetScript("OnTextChanged", function(self) runSearch(self:GetText()) end)
+    searchBox:SetScript("OnEscapePressed", function(self) self:SetText(""); self:ClearFocus() end)
+    searchBox:SetScript("OnEnterPressed",  function(self) self:ClearFocus() end)
+    searchClear:SetScript("OnClick", function() searchBox:SetText(""); searchBox:ClearFocus() end)
+    addTooltip(searchBox, L["Filter the panel: type any keyword from a label or tooltip. Sections without a match are auto-collapsed."])
+    addTooltip(searchClear, L["Clear the search."])
+
     local pageHolder = CreateFrame("Frame", nil, panel)
     pageHolder:SetPoint("TOPLEFT", 8, -60)
     pageHolder:SetPoint("BOTTOMRIGHT", -8, 8)
@@ -1338,9 +1808,14 @@ local function build()
         sf:Hide()
 
         local content = CreateFrame("Frame", nil, sf)
-        content:SetSize(680, 900)
+        content:SetSize(sf:GetWidth() > 0 and sf:GetWidth() or 680, 900)
         sf:SetScrollChild(content)
         sf.content = content
+        -- Content width must follow scroll viewport so section dividers
+        -- and the scrollbar don't clip when the panel is resized.
+        sf:SetScript("OnSizeChanged", function(self, w, _)
+            if w and w > 0 and self.content then self.content:SetWidth(w) end
+        end)
         return sf
     end
 
@@ -1371,14 +1846,166 @@ local function build()
         end)
     end
 
-    pages.layout   = newPage("layout");   buildLayoutPage(pages.layout.content);     autoFitPage(pages.layout)
-    pages.bars     = newPage("bars");     buildBarsPage(pages.bars.content);         autoFitPage(pages.bars)
-    pages.cast     = newPage("cast");     buildCastPage(pages.cast.content);         autoFitPage(pages.cast)
-    pages.text     = newPage("text");     buildTextPage(pages.text.content);         autoFitPage(pages.text)
-    pages.raid     = newPage("raid");     buildRaidMarkerPage(pages.raid.content);   autoFitPage(pages.raid)
-    pages.auras    = newPage("auras");    buildAurasPage(pages.auras.content);       autoFitPage(pages.auras)
-    pages.profiles = newPage("profiles"); buildProfilesPage(pages.profiles.content); autoFitPage(pages.profiles)
-    pages.about    = newPage("about");    buildAboutPage(pages.about.content);       autoFitPage(pages.about)
+    local function buildPage(name, fn)
+        local p = newPage(name)
+        fn(p.content)
+        -- Recompute every section's natural height now that all children are anchored.
+        C_Timer.After(0, function() _refreshHeightsForPage(p.content) end)
+        autoFitPage(p)
+        return p
+    end
+
+    pages.layout   = buildPage("layout",   buildLayoutPage)
+    pages.bars     = buildPage("bars",     buildBarsPage)
+    pages.cast     = buildPage("cast",     buildCastPage)
+    pages.text     = buildPage("text",     buildTextPage)
+    pages.raid     = buildPage("raid",     buildRaidMarkerPage)
+    pages.auras    = buildPage("auras",    buildAurasPage)
+    pages.profiles = buildPage("profiles", buildProfilesPage)
+    pages.about    = buildPage("about",    buildAboutPage)
+    pages.changelog= buildPage("changelog", buildChangelogPage)
+
+    -- Hidden "search results" page — not in the tab list. When the search box
+    -- has a query, every matching widget group is reparented here on the fly,
+    -- with a breadcrumb pointing back to its real tab/section.
+    local resultsPage = newPage("results")
+    local resultsContent = resultsPage.content
+    pages._results = resultsPage  -- registered so we can hide it via the for-loop
+
+    local breadcrumbPool = {}
+    local activeMatches = {}    -- widgets currently moved out to results
+    local lastNormalTabId = "layout"
+
+    local function _moveGroupToResults(w, y)
+        if not w._searchGroup then return y end
+        for _, comp in ipairs(w._searchGroup) do
+            if comp and comp.SetParent then
+                comp:SetParent(resultsContent)
+                if comp.Show then comp:Show() end
+            end
+        end
+        local leader = w._searchGroup[1]
+        if leader and leader.ClearAllPoints then
+            leader:ClearAllPoints()
+            leader:SetPoint("TOPLEFT", resultsContent, "TOPLEFT", 14, y)
+        end
+        return y - 64  -- breadcrumb (14) + widget row (~50)
+    end
+
+    local function _restoreGroupHome(w)
+        if not w._searchGroup then return end
+        for _, comp in ipairs(w._searchGroup) do
+            if comp and comp._homeContainer and comp.SetParent then
+                comp:SetParent(comp._homeContainer)
+            end
+            if comp and comp._homeAnchors and comp.ClearAllPoints then
+                comp:ClearAllPoints()
+                for _, a in ipairs(comp._homeAnchors) do
+                    comp:SetPoint(a.p, a.relTo, a.relPoint, a.x, a.y)
+                end
+            end
+        end
+    end
+
+    local function _gatherMatches(query)
+        local matches = {}
+        for _, sections in pairs(_allSectionsOnPage) do
+            for _, section in ipairs(sections) do
+                for _, w in ipairs(section.children) do
+                    local txt = w._searchText
+                    if txt and w._searchGroup and txt:lower():find(query, 1, true) then
+                        matches[#matches + 1] = w
+                    end
+                end
+            end
+        end
+        return matches
+    end
+
+    -- Real search implementation, assigned to the forward-declared upvalue.
+    _searchImpl = function(rawQuery)
+        local q = (rawQuery or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
+        local empty = (q == "")
+
+        -- Always clear out the previous results state first
+        for _, w in ipairs(activeMatches) do _restoreGroupHome(w) end
+        wipe(activeMatches)
+        for _, fs in ipairs(breadcrumbPool) do fs:Hide() end
+
+        if empty then
+            resultsPage:Hide()
+            for _, p in pairs(pages) do
+                if p ~= resultsPage then p:Hide() end
+            end
+            if pages[lastNormalTabId] then pages[lastNormalTabId]:Show() end
+            for _, ref in ipairs(_searchTabRefs) do
+                ref.btn:SetText(ref.label)
+                if PanelTemplates_TabResize then PanelTemplates_TabResize(ref.btn, 0) end
+            end
+            return
+        end
+
+        local matches = _gatherMatches(q)
+
+        -- Hide every regular page and show the results page instead
+        for _, p in pairs(pages) do
+            if p ~= resultsPage then p:Hide() end
+        end
+
+        local hitsByPage = {}
+        local y = -10
+        for i, w in ipairs(matches) do
+            local fs = breadcrumbPool[i]
+            if not fs then
+                fs = resultsContent:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+                breadcrumbPool[i] = fs
+            end
+            fs:Show()
+            fs:ClearAllPoints()
+            fs:SetPoint("TOPLEFT", resultsContent, "TOPLEFT", 14, y)
+            local section = w._homeSection
+            local sectionTitle = (section and section.header and section.header:GetText()) or "?"
+            local pageContent = section and section._parent
+            local tabLabel = "?"
+            for _, ref in ipairs(_searchTabRefs) do
+                if ref.content == pageContent then tabLabel = ref.label; break end
+            end
+            fs:SetText("|cff888888" .. tabLabel .. "  >  " .. sectionTitle .. "|r")
+
+            if pageContent then hitsByPage[pageContent] = (hitsByPage[pageContent] or 0) + 1 end
+
+            y = y - 14  -- breadcrumb height + small gap before widget
+            y = _moveGroupToResults(w, y)
+            activeMatches[#activeMatches + 1] = w
+        end
+
+        if #matches == 0 then
+            local fs = breadcrumbPool[1]
+            if not fs then
+                fs = resultsContent:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+                breadcrumbPool[1] = fs
+            end
+            fs:Show()
+            fs:ClearAllPoints()
+            fs:SetPoint("TOPLEFT", resultsContent, "TOPLEFT", 14, -20)
+            fs:SetText(L["No options match your search."])
+        end
+
+        resultsContent:SetHeight(math.max(resultsPage:GetHeight(), math.abs(y) + 24))
+        resultsPage:Show()
+
+        -- Update tab labels with hit counts (so the user sees where matches live
+        -- once they clear the search and want to dive in normally).
+        for _, ref in ipairs(_searchTabRefs) do
+            local n = hitsByPage[ref.content] or 0
+            if n == 0 then
+                ref.btn:SetText(ref.label)
+            else
+                ref.btn:SetText(ref.label .. " |cffeda14a(" .. n .. ")|r")
+            end
+            if PanelTemplates_TabResize then PanelTemplates_TabResize(ref.btn, 0) end
+        end
+    end
 
     local tabs = {
         { id = "layout",   label = L["Layout"] },
@@ -1389,9 +2016,16 @@ local function build()
         { id = "auras",    label = L["Auras"] },
         { id = "profiles", label = L["Profiles"] },
         { id = "about",    label = L["About"] },
+        { id = "changelog",label = L["Changelog"] },
     }
     local tabBtns = {}
     local function selectTab(id)
+        -- If a search is active, clear it before switching (which restores the
+        -- widgets reparented to the results page).
+        if searchBox and searchBox:GetText() ~= "" then
+            searchBox:SetText("")
+        end
+        lastNormalTabId = id
         for _, p in pairs(pages) do p:Hide() end
         if pages[id] then pages[id]:Show() end
         for _, t in ipairs(tabBtns) do
@@ -1403,10 +2037,16 @@ local function build()
         end
     end
 
+    wipe(_searchTabRefs)
     for i, t in ipairs(tabs) do
         local b = makeTab(panel, t.id, t.label, i, tabBtns[i - 1])
         b:SetScript("OnClick", function() selectTab(t.id) end)
         tabBtns[#tabBtns + 1] = b
+        if pages[t.id] and pages[t.id].content then
+            _searchTabRefs[#_searchTabRefs + 1] = {
+                btn = b, content = pages[t.id].content, label = t.label,
+            }
+        end
     end
 
     panel.refreshAll = function()

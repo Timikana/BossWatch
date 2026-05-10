@@ -163,10 +163,40 @@ local function GetSafeHealthPercent(unit)
     return (hp / hpMax) * 100
 end
 
+-- Smoothly drive a StatusBar towards `target`. When the user has disabled
+-- smoothing (or the value isn't a plain number), set immediately. The
+-- interpolation runs in the bar's own OnUpdate so it auto-stops when the
+-- frame is hidden.
+local function SmoothSetValue(bar, target)
+    local db = BW:GetDB()
+    if not db.smoothBars or type(target) ~= "number" then
+        bar:SetScript("OnUpdate", nil)
+        bar._smoothing = false
+        bar:SetValue(target or 0)
+        return
+    end
+    bar._smoothTarget = target
+    if bar._smoothing then return end
+    bar._smoothing = true
+    bar:SetScript("OnUpdate", function(self, dt)
+        local cur = self:GetValue() or 0
+        local t = self._smoothTarget or cur
+        local diff = t - cur
+        if math.abs(diff) < 0.4 then
+            self:SetValue(t)
+            self:SetScript("OnUpdate", nil)
+            self._smoothing = false
+            return
+        end
+        -- Ease out: cover ~8x dt of the remaining distance per frame
+        self:SetValue(cur + diff * math.min(1, dt * 8))
+    end)
+end
+
 local function SetHealthValue(frame, unit)
     local pct = GetSafeHealthPercent(unit)
     frame.healthBar:SetMinMaxValues(0, 100)
-    frame.healthBar:SetValue(pct or 0)
+    SmoothSetValue(frame.healthBar, pct or 0)
     frame._hpPct = pct or 0
 end
 
@@ -407,7 +437,7 @@ local function UpdateFrame(frame)
     -- Health
     if frame._testMode then
         frame.healthBar:SetMinMaxValues(0, 100)
-        frame.healthBar:SetValue(frame._testHp or 80)
+        SmoothSetValue(frame.healthBar, frame._testHp or 80)
         frame._hpPct = frame._testHp or 80
     else
         SetHealthValue(frame, unit)
@@ -730,7 +760,10 @@ local function RefreshAll()
     if BW.ApplyFonts then BW:ApplyFonts() end
     for i = 1, MAX_BOSS do
         local f = BW.BossFrames[i]
-        if f then UpdateFrame(f) end
+        if f then
+            UpdateFrame(f)
+            if f.applyClickActions then f.applyClickActions() end
+        end
     end
 end
 BW.RefreshAll = RefreshAll
@@ -749,6 +782,26 @@ local function CreateBossFrame(index)
     f:RegisterForClicks("AnyDown")
     f.unit = unit
     f.index = index
+
+    -- Modifier+click actions: secure attributes set out of combat. ApplyClickActions
+    -- below is also called from RefreshAll so toggling the option re-applies (gated
+    -- on InCombatLockdown, queued via _pendingLayout if needed).
+    f.applyClickActions = function()
+        if InCombatLockdown() then return false end
+        local db = BW:GetDB()
+        if db.clickActions ~= false then
+            f:SetAttribute("shift-type1", "macro")
+            f:SetAttribute("shift-macrotext1",
+                ("/run local i=GetRaidTargetIndex('%s') or 0; if i>=8 then i=0 end; SetRaidTarget('%s', i+1)"):format(unit, unit))
+            f:SetAttribute("ctrl-type1", "focus")
+        else
+            f:SetAttribute("shift-type1", nil)
+            f:SetAttribute("shift-macrotext1", nil)
+            f:SetAttribute("ctrl-type1", nil)
+        end
+        return true
+    end
+    f.applyClickActions()
 
     RegisterStateDriver(f, "visibility", "[@" .. unit .. ",exists]show;hide")
 
