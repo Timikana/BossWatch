@@ -947,8 +947,19 @@ function BossW:EnsureCreated()
     local db = BossW:GetDB()
     if not db.enabled then return end
 
+    -- Clamp saved offsets to current UIParent dimensions. Protects users who
+    -- moved the container on a larger screen then relaunched on a smaller
+    -- one — the saved coords would otherwise place the frame off-screen and
+    -- SetClampedToScreen only prevents future drags, not initial placement.
+    local pw, ph = UIParent:GetWidth(), UIParent:GetHeight()
+    local cw, ch = db.frameWidth or 220, (db.frameHeight + db.frameSpacing) * MAX_BOSS
+    -- Allow generous margin around UIParent (RIGHT anchor uses negative X)
+    local maxX, maxY = pw, ph
+    if math.abs(db.anchorX or 0) > maxX then db.anchorX = 0 end
+    if math.abs(db.anchorY or 0) > maxY then db.anchorY = 0 end
+
     local container = CreateFrame("Frame", "BossWatchContainer", UIParent)
-    container:SetSize(db.frameWidth, (db.frameHeight + db.frameSpacing) * MAX_BOSS)
+    container:SetSize(db.frameWidth, ch)
     container:SetPoint(db.anchor or "RIGHT", UIParent, db.anchor or "RIGHT", db.anchorX or 0, db.anchorY or 0)
     container:SetFrameStrata(db.frameStrata or "MEDIUM")
     container:SetMovable(true)

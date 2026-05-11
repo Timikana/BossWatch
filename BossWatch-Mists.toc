@@ -2,7 +2,7 @@
 ## Title: BossWatch
 ## Notes: Custom boss target frames for WoW MoP Classic
 ## Author: Timikana
-## Version: 0.7.2
+## Version: 0.7.3
 ## IconTexture: Interface\Icons\Achievement_Boss_Argaloth
 ## SavedVariables: BossWatchDB
 ## X-Curse-Project-ID: 1535856

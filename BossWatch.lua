@@ -442,13 +442,87 @@ SlashCmdList["BOSSWATCH"] = function(msg)
     elseif cmd == "reset" then
         BossWatchDB = nil
         ReloadUI()
+    elseif cmd == "auras" then
+        BossW:DumpAuras(arg ~= "" and arg or nil)
     else
         local L = BossW.L
         print("|cffeda55fBossWatch:|r " .. L["commands:"])
         print("  /bossw            - " .. L["open options"])
         print("  /bossw mover      - " .. L["toggle mover"])
         print("  /bossw test N     - " .. L["simulate N bosses (0-5)"])
+        print("  /bossw auras [unit] - " .. L["dump auras on bosses (or given unit) showing which fields are secret-tagged"])
         print("  /bossw reset      - " .. L["reset all settings + reload"])
+    end
+end
+
+-- ============================================================
+-- AURA DEBUG DUMP
+-- Print every aura on each boss unit with per-field secret-status,
+-- so the user can see exactly which data Blizzard exposes vs redacts
+-- on hostile bosses in 12.0+.
+-- ============================================================
+local issecretvalue = _G.issecretvalue or function() return false end
+
+local function _fieldStr(value)
+    if value == nil then return "|cff666666nil|r" end
+    if issecretvalue(value) then return "|cffff5555[secret]|r" end
+    local ok, str = pcall(tostring, value)
+    if ok and str then return "|cff66ff66" .. str .. "|r" end
+    return "|cffff5555[unprintable]|r"
+end
+
+local function _dumpAura(unit, i, filter)
+    local data
+    if C_UnitAuras and C_UnitAuras.GetAuraDataByIndex then
+        data = C_UnitAuras.GetAuraDataByIndex(unit, i, filter)
+    end
+    if not data then
+        local name, icon, count, _, duration, expiration, caster = UnitAura(unit, i, filter)
+        if not name then return false end
+        data = {
+            name = name, icon = icon, applications = count,
+            duration = duration, expirationTime = expiration,
+            sourceUnit = caster,
+        }
+    end
+    print(format("  [%d] name=%s  icon=%s  stacks=%s  duration=%s  expires=%s",
+        i, _fieldStr(data.name), _fieldStr(data.icon),
+        _fieldStr(data.applications), _fieldStr(data.duration),
+        _fieldStr(data.expirationTime)))
+    print(format("       source=%s  isBoss=%s  isPlayer=%s  spellId=%s",
+        _fieldStr(data.sourceUnit), _fieldStr(data.isBossAura),
+        _fieldStr(data.isFromPlayerOrPlayerPet), _fieldStr(data.spellId)))
+    return true
+end
+
+function BossW:DumpAuras(unit)
+    local units
+    if unit then
+        units = { unit }
+    else
+        units = {}
+        for i = 1, BossW.MAX_BOSS do
+            local u = "boss" .. i
+            if UnitExists(u) then units[#units + 1] = u end
+        end
+        if #units == 0 then units = { "target" } end
+    end
+    for _, u in ipairs(units) do
+        if UnitExists(u) then
+            local n = UnitName(u)
+            print(format("|cffeda55f== %s (%s) ==|r", _fieldStr(n), u))
+            for _, filter in ipairs({ "HARMFUL", "HELPFUL" }) do
+                print(format("|cffaaaaaa-- %s --|r", filter))
+                local found = false
+                for i = 1, 40 do
+                    if not _dumpAura(u, i, filter) then break end
+                    found = true
+                end
+                if not found then print("  |cff666666(none)|r") end
+            end
+        else
+            print(format("|cffeda55fBossWatch:|r unit '%s' does not exist", u))
+        end
     end
 end
 
