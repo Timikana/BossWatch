@@ -1606,6 +1606,10 @@ local function buildChangelogPage(page)
 
     -- Per-version blocks. Each entry: { version, date, lines = { ... } }
     local entries = {
+        { ver = "v0.7.4", date = "2026-05-11", lines = {
+            L["Hotfix: smooth health bar finally stops spamming Lua errors on bosses with secret-tagged StatusBar state — we now detect the taint before doing the math instead of trying to catch it (Blizzard's taint logger isn't pcall-catchable)."],
+            L["Modernised aura collection: now uses C_UnitAuras.GetUnitAuraInstanceIDs with native sort rules, so boss debuffs are ordered by Blizzard's own priority instead of raw index order. Legacy fallback preserved for Classic."],
+        }},
         { ver = "v0.7.3", date = "2026-05-11", lines = {
             L["Boss frames now auto-recover when the saved position falls off-screen (e.g. moved on a larger monitor then relaunched on a smaller one) — coords are clamped to current screen bounds on load."],
             L["New debug command /bossw auras [unit] — prints every aura on each boss (or the given unit) with a color-coded readout of which fields Blizzard exposes vs hides as secret values."],

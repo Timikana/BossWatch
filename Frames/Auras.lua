@@ -122,24 +122,58 @@ local function auraMatchesSource(data, source)
     return true
 end
 
+-- Modern API gates (added in 10.0+, may be missing on older Classic clients).
+local GetUnitAuraInstanceIDs = C_UnitAuras and C_UnitAuras.GetUnitAuraInstanceIDs
+local GetAuraDataByAuraInstanceID = C_UnitAuras and C_UnitAuras.GetAuraDataByAuraInstanceID
+
+-- Enemy sort rule prioritizes boss debuffs first, then duration descending —
+-- exactly what we want on hostile bosses. Enum.AuraFilter is missing on
+-- some Classic clients; fall back to nil (default ordering) then.
+local SORT_ENEMY  = Enum and Enum.AuraFilter and Enum.AuraFilter.Harmful or nil
+local SORT_FRIEND = Enum and Enum.AuraFilter and Enum.AuraFilter.Helpful or nil
+
 local auraBuffer = {}
 local function collectAuras(unit, filter, source, maxCount)
     wipe(auraBuffer)
+
+    -- Modern path (10.0+): sorted instance IDs + lookup by ID. Same pattern
+    -- SimpleBossFrame uses. The sortRule is built into the C call → boss
+    -- debuffs naturally float to the top of the list.
+    if GetUnitAuraInstanceIDs and GetAuraDataByAuraInstanceID then
+        local sortRule = (filter == "HARMFUL") and SORT_ENEMY or SORT_FRIEND
+        local ok, ids = pcall(GetUnitAuraInstanceIDs, unit, filter, 40, sortRule, 0)
+        if ok and type(ids) == "table" then
+            for _, instanceID in ipairs(ids) do
+                local data = GetAuraDataByAuraInstanceID(unit, instanceID)
+                if data then
+                    data._auraInstanceID = instanceID
+                    if auraMatchesSource(data, source) then
+                        auraBuffer[#auraBuffer + 1] = data
+                        if #auraBuffer >= maxCount then break end
+                    end
+                end
+            end
+            return auraBuffer
+        end
+    end
+
+    -- Legacy path: GetAuraDataByIndex iteration (Classic clients without the
+    -- instance-ID API, or if the modern call fails).
     if C_UnitAuras and C_UnitAuras.GetAuraDataByIndex then
         for i = 1, 40 do
             local data = C_UnitAuras.GetAuraDataByIndex(unit, i, filter)
             if not data then break end
-            data._auraIndex = i  -- preserved for tooltip fallback
+            data._auraIndex = i
+            data._auraInstanceID = data.auraInstanceID
             if auraMatchesSource(data, source) then
                 auraBuffer[#auraBuffer + 1] = data
                 if #auraBuffer >= maxCount then break end
             end
         end
     else
+        -- UnitAura legacy (oldest Classic clients). Position 12 (isBossDebuff)
+        -- since MoP — populating data.isBossAura makes BOSS_ONLY exact.
         for i = 1, 40 do
-            -- Position 12 (isBossDebuff) is available since MoP. Populating
-            -- data.isBossAura makes the BOSS_ONLY filter exact instead of
-            -- falling back to the fragile sourceUnit:match("^boss") test.
             local name, icon, count, _, duration, expiration, caster,
                   _, _, _, _, isBossDebuff = UnitAura(unit, i, filter)
             if not name then break end
@@ -148,7 +182,7 @@ local function collectAuras(unit, filter, source, maxCount)
                 duration = duration or 0, expirationTime = expiration or 0,
                 sourceUnit = caster,
                 isBossAura = isBossDebuff or false,
-                _auraIndex = i,  -- preserved for tooltip
+                _auraIndex = i,
             }
             if auraMatchesSource(data, source) then
                 auraBuffer[#auraBuffer + 1] = data
