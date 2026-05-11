@@ -182,8 +182,20 @@ local function SmoothSetValue(bar, target)
     if bar._smoothing then return end
     bar._smoothing = true
     bar:SetScript("OnUpdate", function(self, dt)
-        local cur = self:GetValue() or 0
-        local t = self._smoothTarget or cur
+        local cur = self:GetValue()
+        local t = self._smoothTarget
+        -- Taint guard: a StatusBar that was ever fed a secret value keeps
+        -- returning a secret-tagged number from GetValue(), even after we
+        -- set it to a plain number later. Secret-value arithmetic violations
+        -- are NOT catchable by pcall — they're a Blizzard runtime taint
+        -- logger that fires unconditionally. So check BEFORE the subtract:
+        -- bail to a direct SetValue and stop the OnUpdate.
+        if cur == nil or t == nil or issecretvalue(cur) or issecretvalue(t) then
+            pcall(self.SetValue, self, t or 0)
+            self:SetScript("OnUpdate", nil)
+            self._smoothing = false
+            return
+        end
         local diff = t - cur
         if math.abs(diff) < 0.4 then
             self:SetValue(t)
