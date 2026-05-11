@@ -1606,6 +1606,10 @@ local function buildChangelogPage(page)
 
     -- Per-version blocks. Each entry: { version, date, lines = { ... } }
     local entries = {
+        { ver = "v0.7.3", date = "2026-05-11", lines = {
+            L["Boss frames now auto-recover when the saved position falls off-screen (e.g. moved on a larger monitor then relaunched on a smaller one) — coords are clamped to current screen bounds on load."],
+            L["New debug command /bossw auras [unit] — prints every aura on each boss (or the given unit) with a color-coded readout of which fields Blizzard exposes vs hides as secret values."],
+        }},
         { ver = "v0.7.2", date = "2026-05-10", lines = {
             L["Hover an aura icon on a boss frame to see its standard Blizzard tooltip — name, description, remaining duration. Toggle in Auras > Display."],
         }},
