@@ -1613,6 +1613,9 @@ function _BuildChangelogSection(parent, anchorWidget)
 
     -- Per-version blocks. Each entry: { version, date, lines = { ... } }
     local entries = {
+        { ver = "v0.7.6", date = "2026-05-12", lines = {
+            L["Hotfix: the options window is now clamped to current screen bounds on load — no more panel stuck off-screen after switching from a larger monitor to a smaller one."],
+        }},
         { ver = "v0.7.5", date = "2026-05-12", lines = {
             L["Changelog moved from a separate bottom tab into a section at the bottom of the About tab — one less tab to scan, version history sits next to the version number naturally."],
             L["New 3rd side tab slot on the left edge of the panel for SplitWatch (sister addon, appears when installed)."],
@@ -1750,11 +1753,19 @@ local function build()
     -- Modern Blizzard 11.0 portrait frame (used by Item Upgrades, Adventure Guide, etc.)
     panel = CreateFrame("Frame", "BossWatchOptions", UIParent, "PortraitFrameTemplate")
     BossWatchDB = BossWatchDB or {}
-    local startW = math.max(720, BossWatchDB.panelW or 720)
-    local startH = math.max(500, BossWatchDB.panelH or 620)
+    -- Clamp saved size to current UIParent dimensions. Protects users who
+    -- enlarged the panel on a larger monitor then relaunched on a smaller
+    -- screen — the saved size would otherwise make the panel overflow.
+    local pw, ph = UIParent:GetWidth(), UIParent:GetHeight()
+    local startW = math.min(pw - 40, math.max(720, BossWatchDB.panelW or 720))
+    local startH = math.min(ph - 40, math.max(500, BossWatchDB.panelH or 620))
     panel:SetSize(startW, startH)
     if BossWatchDB.panelPoint then
         local p = BossWatchDB.panelPoint
+        -- Clamp saved offsets too — SetClampedToScreen only kicks in on
+        -- subsequent drags, not on initial placement.
+        if math.abs(p.x or 0) > pw then p.x = 0 end
+        if math.abs(p.y or 0) > ph then p.y = 0 end
         panel:ClearAllPoints()
         panel:SetPoint(p.point or "CENTER", UIParent, p.relPoint or "CENTER", p.x or 0, p.y or 0)
     else
