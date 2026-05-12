@@ -1,0 +1,33 @@
+name: Lint
+
+on:
+  push:
+    branches: [main, beta]
+  pull_request:
+    branches: [main, beta]
+
+jobs:
+  luacheck:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Lua + LuaRocks + luacheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lua5.1 luarocks
+          sudo luarocks install luacheck
+
+      - name: Run luacheck
+        run: |
+          # Fail only on real errors (exit code 2+) — warnings (exit code 1)
+          # are shown in the log but do not block the build. WoW addon code
+          # is full of intentional patterns (cached globals, callback args)
+          # that luacheck flags but that we know are correct.
+          luacheck . --no-color --codes || code=$?
+          if [ "${code:-0}" -ge 2 ]; then
+            echo "::error::luacheck reported syntax errors (exit $code)"
+            exit "$code"
+          fi
+          echo "luacheck exit: ${code:-0} (warnings only — non-blocking)"

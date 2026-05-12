@@ -2,7 +2,7 @@
 ## Title: BossWatch
 ## Notes: Custom boss target frames for WoW Retail / Midnight 12.0
 ## Author: Timikana
-## Version: 0.7.6
+## Version: 0.7.7
 ## IconTexture: Interface\Icons\Achievement_Boss_Argaloth
 ## SavedVariables: BossWatchDB
 ## AllowAddOnTableAccess: 1
@@ -33,4 +33,17 @@ Frames\CastBar.lua
 Frames\Auras.lua
 
 # Options panel
+# Load order matters:
+#   1. Widgets.lua first — defines widget factories on BossW.Options
+#   2. Panel.lua — defines section system + harness; aliases factories from O
+#   3. Pages/*.lua — page builders, register into BossW.Options.Pages
+Options\Widgets.lua
 Options\Panel.lua
+Options\Pages\Layout.lua
+Options\Pages\Bars.lua
+Options\Pages\Cast.lua
+Options\Pages\Text.lua
+Options\Pages\Raid.lua
+Options\Pages\Auras.lua
+Options\Pages\Profiles.lua
+Options\Pages\About.lua
