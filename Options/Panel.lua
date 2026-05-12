@@ -4,6 +4,13 @@ local L = BossW.L
 local CreateFrame = CreateFrame
 local pairs, ipairs = pairs, ipairs
 
+-- Shared namespace for external page files (Options/Pages/*.lua).
+-- After this file loads, external files use `BossW.Options.makeCheck` etc.
+-- and register their builders into `BossW.Options.Pages.<id>`.
+BossW.Options = BossW.Options or {}
+BossW.Options.Pages = BossW.Options.Pages or {}
+local O = BossW.Options
+
 local panel
 local refresh = function() if BossW.RefreshAll then BossW:RefreshAll() end end
 
@@ -847,7 +854,32 @@ local function makeTab(parent, id, label, idx, prevTab)
 end
 
 -- ============================================================
+-- EXPOSE HELPERS TO EXTERNAL PAGE FILES (Options/Pages/*.lua)
+-- ============================================================
+-- All factory functions and helpers used by page builders live here as
+-- locals. External page files cannot see closure-captured locals, so we
+-- mirror them onto BossW.Options. Page files do `local O = BossW.Options`
+-- at the top and then `local makeSection = O.makeSection` etc.
+O.addTooltip          = addTooltip
+O.markAsNew           = markAsNew
+O._registerInSection  = _registerInSection
+O.makeSlider          = makeSlider
+O.makeCheck           = makeCheck
+O.makeDropdown        = makeDropdown
+O.makeMediaDropdown   = makeMediaDropdown
+O.makeColorPicker     = makeColorPicker
+O.makeSection         = makeSection
+O.ANCHOR9             = ANCHOR9
+-- Setter so external files can reset _currentSection (e.g. pages that have
+-- no makeSection of their own — About, Profiles — must clear it so widgets
+-- created there don't auto-register into the previous page's last section).
+O.setCurrentSection   = function(v) _currentSection = v end
+
+-- ============================================================
 -- PAGE BUILDERS
+-- (Most pages live in Options/Pages/*.lua and register themselves into
+-- O.Pages.<id>. The few that remain inline here are mostly empty stubs
+-- kept for transitional reasons.)
 -- ============================================================
 
 local function buildLayoutPage(page)
