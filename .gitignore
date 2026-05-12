@@ -31,6 +31,3 @@ WTF/
 # Logs
 *.log
 
-# Local changelog drafts (release notes are in tag annotation + Discord)
-.changelog_*.md
-

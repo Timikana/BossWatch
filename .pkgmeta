@@ -26,4 +26,5 @@ ignore:
   - LICENSE
   - logo.png
   - CLAUDE.md
+  - CHANGELOG.md
   - .pkgmeta
