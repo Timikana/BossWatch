@@ -400,6 +400,7 @@ L["Enable modifier+click shortcuts on boss frames: Shift+Click cycles a raid mar
 -- Changelog tab
 L["Release notes and recent changes."] = "Notes de version et changements récents."
 L["Compatibility with WoW patch 12.0.7 (no more out-of-date warning)."] = "Compatibilité avec le patch WoW 12.0.7 (plus d'avertissement \"obsolète\")."
+L["Hotfix: the options window is now clamped to current screen bounds on load — no more panel stuck off-screen after switching from a larger monitor to a smaller one."] = "Hotfix : le panneau d'options est maintenant clampé aux dimensions de l'écran au chargement — plus de panneau coincé hors écran après être passé d'un grand moniteur à un plus petit."
 L["Changelog moved from a separate bottom tab into a section at the bottom of the About tab — one less tab to scan, version history sits next to the version number naturally."] = "Le changelog est déplacé d'un onglet dédié vers une section au bas de l'onglet À propos — un onglet en moins à scanner, l'historique colle naturellement au numéro de version."
 L["New 3rd side tab slot on the left edge of the panel for SplitWatch (sister addon, appears when installed)."] = "Nouveau 3e slot d'onglet latéral à gauche du panneau pour SplitWatch (addon frère, apparaît quand installé)."
 L["Internal: release notes now live in a single CHANGELOG.md at repo root instead of one file per version. Easier to read on GitHub."] = "Interne : les notes de version vivent maintenant dans un CHANGELOG.md unique à la racine du repo au lieu d'un fichier par version. Plus lisible sur GitHub."

@@ -1613,6 +1613,9 @@ function _BuildChangelogSection(parent, anchorWidget)
 
     -- Per-version blocks. Each entry: { version, date, lines = { ... } }
     local entries = {
+        { ver = "v0.7.6", date = "2026-05-12", lines = {
+            L["Hotfix: the options window is now clamped to current screen bounds on load — no more panel stuck off-screen after switching from a larger monitor to a smaller one."],
+        }},
         { ver = "v0.7.5", date = "2026-05-12", lines = {
             L["Changelog moved from a separate bottom tab into a section at the bottom of the About tab — one less tab to scan, version history sits next to the version number naturally."],
             L["New 3rd side tab slot on the left edge of the panel for SplitWatch (sister addon, appears when installed)."],

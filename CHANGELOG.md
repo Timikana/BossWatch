@@ -6,6 +6,11 @@ versionnage selon [SemVer](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+## [0.7.6] - 2026-05-12
+
+### Corrigé
+- **Panneau d'options hors écran après changement de résolution.** Si tu avais déplacé ou agrandi le panneau sur un grand moniteur puis relancé WoW sur un écran plus petit, le panneau pouvait apparaître partiellement ou totalement hors écran (`SetClampedToScreen` ne protège que les drag ultérieurs, pas le placement initial). La position ET la taille sauvegardées sont maintenant clampées aux dimensions courantes de `UIParent` au chargement. Pendant équivalent côté frames boss déjà fait en v0.7.3.
+
 ## [0.7.5] - 2026-05-12
 
 ### Modifié
