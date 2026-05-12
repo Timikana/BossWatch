@@ -1,7 +1,7 @@
 -- luacheck config for BossWatch
 -- Run locally: `luacheck .` (or via the CI workflow at .github/workflows/lint.yml)
 
-std = "lua51+wow"
+std = "lua51"
 
 -- Ignore the bundled third-party libraries — they have their own style.
 exclude_files = {
