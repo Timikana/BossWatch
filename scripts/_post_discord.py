@@ -25,16 +25,28 @@ if __name__ == "__main__":
     webhook = os.environ.get("DISCORD_RELEASE_WEBHOOK")
     if not webhook:
         print("DISCORD_RELEASE_WEBHOOK not set in .env", file=sys.stderr); sys.exit(1)
+    # For beta tags we extract the [Unreleased] section since that's what
+    # the user is shipping pre-merge. For stable tags we extract the
+    # versioned block.
+    extract_key = "Unreleased" if "-beta" in version or "-alpha" in version else version
     body = subprocess.check_output(
-        ["bash", "scripts/extract_changelog.sh", version]
+        ["bash", "scripts/extract_changelog.sh", extract_key]
     ).decode("utf-8").strip()
+    # Distinguish prerelease channels by embed color so users immediately
+    # see whether a notification is a stable, beta or alpha release.
+    if "-beta" in version:
+        color, label = 0xE67E22, " (beta)"   # orange
+    elif "-alpha" in version:
+        color, label = 0x95A5A6, " (alpha)"  # grey
+    else:
+        color, label = 0x3498DB, ""          # blue (stable)
     data = json.dumps({
         "username": "BossWatch Releases",
         "embeds": [{
-            "title": f"BossWatch v{version}",
+            "title": f"BossWatch v{version}{label}",
             "url": f"https://github.com/Timikana/BossWatch/releases/tag/v{version}",
             "description": body[:4000],
-            "color": 0x3498DB,
+            "color": color,
         }],
     }).encode("utf-8")
     req = urllib.request.Request(
