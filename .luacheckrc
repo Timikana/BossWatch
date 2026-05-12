@@ -55,13 +55,19 @@ read_globals = {
     "SlashCmdList", "issecretvalue",
 
     -- Misc legacy
-    "setfenv", "loadstring", "wipe",
+    "setfenv", "loadstring", "wipe", "format",
     "ChatFontNormal", "Settings", "StaticPopupDialogs", "StaticPopup_Show",
     "PanelTemplates_SelectTab", "PanelTemplates_DeselectTab",
     "PanelTemplates_TabResize",
     "InterfaceOptions_AddCategory",
     "PlaySound", "SOUNDKIT",
     "C_Timer",
+
+    -- WoW UI mixins / widget classes
+    "MinimalSliderWithSteppersMixin", "ColorPickerFrame", "OpacitySliderFrame",
+
+    -- Localized constants exposed as globals by Blizzard FrameXML
+    "ACCEPT", "CANCEL", "YES", "NO",
 }
 
 -- Globals we write (typically SavedVariables and namespace).
@@ -74,12 +80,22 @@ globals = {
     "BossWatchFrame4", "BossWatchFrame5",
 }
 
--- Style — we keep it lenient.
+-- Style — we keep it lenient. Many of these are intentional WoW addon
+-- patterns (caching globals as locals for perf, ignoring callback args,
+-- standard `addonName, AddonTable = ...` boilerplate, etc.).
 ignore = {
+    "111",       -- setting non-standard global variable (SLASH_*, etc.)
+    "112",       -- mutating non-standard global variable
+    "113",       -- accessing undefined global (we whitelist explicitly)
+    "121",       -- setting read-only global (Blizzard's globals are "read-only" per std)
+    "122",       -- setting read-only field of global (e.g. SlashCmdList["BOSSWATCH"])
+    "211",       -- unused variable (typically `local UnitExists = UnitExists` perf cache)
     "212/self",  -- unused argument 'self' (common in addon callbacks)
     "212/_.*",   -- unused argument starting with underscore (intentional)
     "213",       -- unused loop variable (common with `_, v in pairs`)
-    "631",       -- line is too long — we have many user-facing string lines
+    "311",       -- value assigned to variable is unused
+    "542",       -- empty if branch (common in defensive coding)
+    "631",       -- line is too long — many user-facing string lines
 }
 
 -- Per-file overrides
