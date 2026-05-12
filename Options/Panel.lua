@@ -1597,15 +1597,27 @@ local function buildAboutPage(page)
     )
 
     local hint = page:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    hint:SetPoint("BOTTOMLEFT", page, "BOTTOMLEFT", 14, 12)
+    hint:SetPoint("TOPLEFT", cmds, "BOTTOMLEFT", 0, -8)
     hint:SetText(L["Click a URL to select it, then Ctrl+C to copy."])
+
+    -- ---- Changelog section (chained at the bottom of About) ----
+    -- Convention as of v0.7.5: the version history lives as a section in the
+    -- About tab instead of a separate Changelog tab. Frees a bottom-tab slot
+    -- and groups identity/version info naturally.
+    -- Anchor it BELOW the URL hint, so it doesn't overlap the page header.
+    _BuildChangelogSection(page, hint)
 end
 
-local function buildChangelogPage(page)
-    _currentSection = nil  -- raw content, no sections
+function _BuildChangelogSection(parent, anchorWidget)
+    local page = parent  -- alias for legacy var name below
 
     -- Per-version blocks. Each entry: { version, date, lines = { ... } }
     local entries = {
+        { ver = "v0.7.5", date = "2026-05-12", lines = {
+            L["Changelog moved from a separate bottom tab into a section at the bottom of the About tab — one less tab to scan, version history sits next to the version number naturally."],
+            L["New 3rd side tab slot on the left edge of the panel for SplitWatch (sister addon, appears when installed)."],
+            L["Internal: release notes now live in a single CHANGELOG.md at repo root instead of one file per version. Easier to read on GitHub."],
+        }},
         { ver = "v0.7.4", date = "2026-05-11", lines = {
             L["Hotfix: smooth health bar finally stops spamming Lua errors on bosses with secret-tagged StatusBar state — we now detect the taint before doing the math instead of trying to catch it (Blizzard's taint logger isn't pcall-catchable)."],
             L["Modernised aura collection: now uses C_UnitAuras.GetUnitAuraInstanceIDs with native sort rules, so boss debuffs are ordered by Blizzard's own priority instead of raw index order. Legacy fallback preserved for Classic."],
@@ -1678,31 +1690,56 @@ local function buildChangelogPage(page)
         }},
     }
 
-    local y = -10
+    -- Section header anchored to the previous widget (if any) so the
+    -- changelog lays out under the rest of the About content instead of
+    -- starting at the top of the page (which would overlap the logo).
+    local header = page:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    if anchorWidget then
+        header:SetPoint("TOPLEFT", anchorWidget, "BOTTOMLEFT", 0, -20)
+    else
+        header:SetPoint("TOPLEFT", 14, -10)
+    end
+    header:SetText("|cffeda14a" .. (L["Changelog"] or "Changelog") .. "|r")
+
+    local divider = page:CreateTexture(nil, "OVERLAY")
+    divider:SetColorTexture(0.4, 0.32, 0.2, 0.6)
+    divider:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 0, -2)
+    divider:SetSize(680, 1)
+
+    -- Anchor strategy: Y is chained to the previous widget's BOTTOM (so we
+    -- flow downward), X is ALWAYS pinned to the page's LEFT (so each row
+    -- gets a consistent indent regardless of what came before). Without
+    -- this split, anchoring a title under a previously-indented bullet
+    -- inherited the indent and drifted right with every version.
+    local prev = divider
+    local prevGap = -10
     for _, entry in ipairs(entries) do
         local title = page:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-        title:SetPoint("TOPLEFT", 14, y)
+        title:SetPoint("TOP",  prev, "BOTTOM", 0, prevGap)
+        title:SetPoint("LEFT", page, "LEFT", 14, 0)
+        title:SetJustifyH("LEFT")
         title:SetText("|cffeda14a" .. entry.ver .. "|r  |cff888888" .. entry.date .. "|r")
-        y = y - 22
+        prev = title
+        prevGap = -4
 
         for _, line in ipairs(entry.lines) do
             local fs = page:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-            fs:SetPoint("TOPLEFT", 24, y)
+            fs:SetPoint("TOP",  prev, "BOTTOM", 0, prevGap)
+            fs:SetPoint("LEFT", page, "LEFT", 24, 0)
             fs:SetWidth(620)
             fs:SetJustifyH("LEFT")
             fs:SetSpacing(2)
             fs:SetText("• " .. line)
-            -- GetStringHeight needs a layout pass; estimate generously per line
-            -- so very long entries don't overlap. C_Timer fix-up could refine.
-            local lines = math.max(1, math.ceil(#line / 90))
-            y = y - (lines * 16 + 4)
+            prev = fs
+            prevGap = -2
         end
-        y = y - 14
+        prevGap = -10
     end
 
-    local hint = page:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    hint:SetPoint("TOPLEFT", 14, y - 6)
-    hint:SetText(L["Full GitHub history: https://github.com/Timikana/BossWatch/releases"])
+    local foot = page:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    foot:SetPoint("TOP",  prev, "BOTTOM", 0, -12)
+    foot:SetPoint("LEFT", page, "LEFT", 14, 0)
+    foot:SetText(L["Full GitHub history: https://github.com/Timikana/BossWatch/releases"])
 end
 
 -- ============================================================
@@ -1899,7 +1936,7 @@ local function build()
     pages.auras    = buildPage("auras",    buildAurasPage)
     pages.profiles = buildPage("profiles", buildProfilesPage)
     pages.about    = buildPage("about",    buildAboutPage)
-    pages.changelog= buildPage("changelog", buildChangelogPage)
+    -- Changelog is no longer a tab — it's a section at the bottom of About.
 
     -- Hidden "search results" page — not in the tab list. When the search box
     -- has a query, every matching widget group is reparented here on the fly,
@@ -2052,7 +2089,6 @@ local function build()
         { id = "auras",    label = L["Auras"] },
         { id = "profiles", label = L["Profiles"] },
         { id = "about",    label = L["About"] },
-        { id = "changelog",label = L["Changelog"] },
     }
     local tabBtns = {}
     local function selectTab(id)
@@ -2163,6 +2199,27 @@ local function build()
                   TW:ShowOptionsAt(point, relPoint, x, y)
               elseif TW and TW.ToggleOptions then
                   TW:ToggleOptions()
+              end
+          end },
+        { id = "SplitWatch", isSelf = false, icon = "Interface\\AddOns\\SplitWatch\\Media\\logo.png",
+          tooltip = L["Open SplitWatch options"],
+          loadedCheck = function()
+              local SplitW = _G.SplitWatch
+              return C_AddOns and C_AddOns.IsAddOnLoaded
+                     and C_AddOns.IsAddOnLoaded("SplitWatch")
+                     and SplitW and SplitW.ToggleOptions
+          end,
+          onClick = function()
+              local point, _, relPoint, x, y
+              if panel and panel:IsShown() then
+                  point, _, relPoint, x, y = panel:GetPoint(1)
+                  panel:Hide()
+              end
+              local SplitW = _G.SplitWatch
+              if SplitW and SplitW.ShowOptionsAt and point then
+                  SplitW:ShowOptionsAt(point, relPoint, x, y)
+              elseif SplitW and SplitW.ToggleOptions then
+                  SplitW:ToggleOptions()
               end
           end },
     }
