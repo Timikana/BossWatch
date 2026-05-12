@@ -6,6 +6,15 @@ versionnage selon [SemVer](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+## [0.7.7] - 2026-05-12
+
+### Modifié
+- **Refactor interne du panneau d'options.** Le fichier `Options/Panel.lua` est passé de 2407 lignes à 1043 (-57%). Chaque onglet vit maintenant dans son propre fichier sous `Options/Pages/` (Layout, Bars, Cast, Text, Raid, Auras, Profils, À propos), et les factories de widgets sont isolées dans `Options/Widgets.lua`. Aucun changement de comportement utilisateur — la base de code est juste plus saine pour les évolutions futures.
+
+### Ajouté
+- **Lint CI** via `luacheck` sur chaque push beta/main (GitHub Actions). Détecte les erreurs de syntaxe avant que les utilisateurs ne les voient.
+- **Script `scripts/release_beta.sh`** pour publier sur le **channel beta** de CurseForge / Wago (séparé du channel stable). Les notifications Discord sortent en orange pour distinguer.
+
 ## [0.7.6] - 2026-05-12
 
 ### Corrigé

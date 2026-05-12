@@ -14,6 +14,10 @@ local function buildChangelogSection(parent, anchorWidget)
 
     -- Per-version blocks. Each entry: { version, date, lines = { ... } }
     local entries = {
+        { ver = "v0.7.7", date = "2026-05-12", lines = {
+            L["Internal: options panel split across multiple files — one file per tab under Options/Pages/, widget factories isolated in Options/Widgets.lua. No user-visible change; the code base is just cleaner for future work."],
+            L["Internal: CI lint (luacheck) runs on every push to catch syntax errors before release."],
+        }},
         { ver = "v0.7.6", date = "2026-05-12", lines = {
             L["Hotfix: the options window is now clamped to current screen bounds on load — no more panel stuck off-screen after switching from a larger monitor to a smaller one."],
         }},
