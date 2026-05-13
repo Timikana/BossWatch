@@ -6,6 +6,15 @@ versionnage selon [SemVer](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+## [0.7.8] - 2026-05-13
+
+### Modifié
+- **L'overlay d'absorption (boucliers, bulles) n'est plus marqué "expérimental"** — la feature est stable depuis plusieurs versions et fonctionne sur les boss avec valeurs secrètes via le pattern tracker invisible + texture visible.
+- **Couleur d'absorption par défaut passée de cyan translucide à jaune opaque (`#FFEB3EFF`).** Plus visible par-dessus la barre de vie, et les nouveaux utilisateurs n'ont plus à régler l'alpha eux-mêmes. Les profils existants gardent leur couleur — change-la dans Bars > Absorbs ou fais `/bossw reset` pour récupérer le nouveau défaut.
+
+### Ajouté
+- Liste des slash commands de l'onglet **À propos** complétée : `/bosswatch` (alias) et `/bossw auras [unit]` (commande de debug) sont maintenant listés.
+
 ## [0.7.7] - 2026-05-12
 
 ### Modifié

@@ -48,9 +48,9 @@ function O.Pages.bars(page)
 
     -- ============ ABSORBS ============
     y = y - 60
-    makeSection(page, L["Absorbs"] .. " |cffff4040(" .. (L["Experimental"] or "Experimental") .. ")|r", 14, y, "bars.absorbs"); y = y - 24
+    makeSection(page, L["Absorbs"], 14, y, "bars.absorbs"); y = y - 24
     addTooltip(markAsNew(makeCheck(page, L["Show absorbs / shields"], "showAbsorbs", 14, y), "showAbsorbs"),
-        L["Display incoming damage absorbs (shields, bubbles) as a translucent overlay extending the health bar. May not show on bosses with secret-tagged values."])
+        L["Display incoming damage absorbs (shields, bubbles) as a translucent overlay extending the health bar."])
     addTooltip(markAsNew(makeColorPicker(page, L["Absorb color"], "absorbColor", 280, y), "absorbColor"),
         L["Color and opacity of the absorb overlay. Default matches Blizzard's standard shield cyan."])
     y = y - 56
