@@ -248,7 +248,7 @@ L["Absorb Texture"]         = "Texture absorption"
 L["Absorb color"]           = "Couleur absorption"
 L["Color and opacity of the absorb overlay. Default matches Blizzard's standard shield cyan."] = "Couleur et opacité de la surcouche d'absorption. Par défaut le cyan standard des boucliers Blizzard."
 L["Status bar texture used for the absorb overlay."] = "Texture utilisée pour la surcouche d'absorption."
-L["Display incoming damage absorbs (shields, bubbles) as a translucent overlay extending the health bar. May not show on bosses with secret-tagged values."] = "Affiche les absorptions de dégâts (boucliers, bulles) en surcouche translucide qui prolonge la barre de vie. Peut ne pas s'afficher sur les boss avec valeurs secrètes."
+L["Display incoming damage absorbs (shields, bubbles) as a translucent overlay extending the health bar."] = "Affiche les absorptions de dégâts (boucliers, bulles) en surcouche translucide qui prolonge la barre de vie."
 L["General"]            = "Général"
 L["Dimensions"]         = "Dimensions"
 L["Portrait"]           = "Portrait"
@@ -399,6 +399,9 @@ L["Enable modifier+click shortcuts on boss frames: Shift+Click cycles a raid mar
 
 -- Changelog tab
 L["Release notes and recent changes."] = "Notes de version et changements récents."
+L["Absorb overlay is no longer flagged 'experimental' — the feature has been stable for several versions and works on bosses with secret-tagged values."] = "L'overlay d'absorption n'est plus marqué \"expérimental\" — la feature est stable depuis plusieurs versions et fonctionne sur les boss avec valeurs secrètes."
+L["Default absorb color changed from translucent cyan to opaque yellow (#FFEB3EFF). Existing profiles keep their color; run /bossw reset or pick the new color manually in Bars > Absorbs to get the new default."] = "Couleur d'absorption par défaut passée de cyan translucide à jaune opaque (#FFEB3EFF). Les profils existants gardent leur couleur ; fais /bossw reset ou change la couleur dans Bars > Absorbs pour récupérer le nouveau défaut."
+L["About tab: slash command list now includes /bosswatch (alias) and /bossw auras [unit] (debug)."] = "Onglet À propos : la liste des slash commands inclut maintenant /bosswatch (alias) et /bossw auras [unit] (debug)."
 L["Compatibility with WoW patch 12.0.7 (no more out-of-date warning)."] = "Compatibilité avec le patch WoW 12.0.7 (plus d'avertissement \"obsolète\")."
 L["Internal: options panel split across multiple files — one file per tab under Options/Pages/, widget factories isolated in Options/Widgets.lua. No user-visible change; the code base is just cleaner for future work."] = "Interne : le panneau d'options est splitté en plusieurs fichiers — un par onglet sous Options/Pages/, les factories de widgets isolées dans Options/Widgets.lua. Aucun changement visible côté utilisateur ; la base de code est juste plus propre pour les évolutions futures."
 L["Internal: CI lint (luacheck) runs on every push to catch syntax errors before release."] = "Interne : un lint CI (luacheck) tourne à chaque push pour attraper les erreurs de syntaxe avant la release."

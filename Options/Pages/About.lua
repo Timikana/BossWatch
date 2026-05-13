@@ -14,6 +14,11 @@ local function buildChangelogSection(parent, anchorWidget)
 
     -- Per-version blocks. Each entry: { version, date, lines = { ... } }
     local entries = {
+        { ver = "v0.7.8", date = "2026-05-13", lines = {
+            L["Absorb overlay is no longer flagged 'experimental' — the feature has been stable for several versions and works on bosses with secret-tagged values."],
+            L["Default absorb color changed from translucent cyan to opaque yellow (#FFEB3EFF). Existing profiles keep their color; run /bossw reset or pick the new color manually in Bars > Absorbs to get the new default."],
+            L["About tab: slash command list now includes /bosswatch (alias) and /bossw auras [unit] (debug)."],
+        }},
         { ver = "v0.7.7", date = "2026-05-12", lines = {
             L["Internal: options panel split across multiple files — one file per tab under Options/Pages/, widget factories isolated in Options/Widgets.lua. No user-visible change; the code base is just cleaner for future work."],
             L["Internal: CI lint (luacheck) runs on every push to catch syntax errors before release."],
@@ -252,11 +257,13 @@ function O.Pages.about(page)
     cmds:SetWidth(680); cmds:SetJustifyH("LEFT"); cmds:SetSpacing(3)
     cmds:SetText(
         "|cffffff00/bossw|r — " .. L["open options"] .. "\n" ..
+        "|cffffff00/bosswatch|r |cff888888(" .. L["alias"] .. ")|r — " .. L["open options"] .. "\n" ..
         "|cffffff00/bossw config|r |cff888888(" .. L["alias"] .. ")|r — " .. L["open options"] .. "\n" ..
         "|cffffff00/bossw options|r |cff888888(" .. L["alias"] .. ")|r — " .. L["open options"] .. "\n" ..
         "|cffffff00/bossw mover|r — " .. L["toggle mover"] .. "\n" ..
         "|cffffff00/bossw test N|r — " .. L["simulate N bosses (0-5)"] .. "\n" ..
         "|cffffff00/bossw test 0|r — " .. L["stop the simulation"] .. "\n" ..
+        "|cffffff00/bossw auras|r |cff888888[unit]|r — " .. L["dump auras on bosses (or given unit) showing which fields are secret-tagged"] .. "\n" ..
         "|cffffff00/bossw reset|r — " .. L["reset all settings + reload"]
     )
 

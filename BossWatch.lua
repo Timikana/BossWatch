@@ -36,11 +36,10 @@ BossW.Defaults = {
     powerTexture = "Blizzard Raid Bar",
 
     -- Absorbs / shields overlay on the health bar
-    -- Default color matches Blizzard's standard shield overlay (light cyan)
     showAbsorbs = true,
     absorbTexture = "Blizzard Raid Bar",
-    -- #FFEB3E80
-    absorbColor   = { r = 0xFF/0xFF, g = 0xEB/0xFF, b = 0x3E/0xFF, a = 0x80/0xFF },
+    -- #FFEB3EFF — opaque yellow
+    absorbColor   = { r = 0xFF/0xFF, g = 0xEB/0xFF, b = 0x3E/0xFF, a = 0xFF/0xFF },
 
     -- Cast
     castTexture = "Blizzard Modern",
