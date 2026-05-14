@@ -3,6 +3,21 @@
 Thumbs.db
 desktop.ini
 
+# Google Drive (Drive for desktop)
+.tmp.drivedownload
+.tmp.driveupload
+.driveupload
+.drivedownload
+*.gdoc
+*.gsheet
+*.gslides
+*.gdraw
+*.gform
+*.gmap
+*.gsite
+*.gtable
+*.glink
+
 # Editors / IDE
 .vscode/
 .idea/
