@@ -401,23 +401,29 @@ BossW.L = setmetatable({}, { __index = function(t, k) return k end })
 -- HIDE BLIZZARD BOSS FRAMES
 -- ============================================================
 local blizzardHidden = false
+-- Hide Blizzard boss frames WITHOUT tainting them.
+-- In WoW 12.0+, overriding `frame.Show = function() end` or calling
+-- `UnregisterAllEvents()` on a secure Blizzard frame taints that frame and
+-- every child. The taint then cascades through EditMode (RefreshArenaFrames
+-- → CastingBarFrame:StopFinishAnims iterates a now-<forbidden table>) and
+-- spams "execution tainted by 'BossWatch'" the moment the user opens EditMode.
+-- Safe approach: move the frames off-screen and disable mouse — visually gone,
+-- secure methods untouched.
+local function _hideSecure(f)
+    if not f then return end
+    f:SetAlpha(0)
+    if f.EnableMouse then f:EnableMouse(false) end
+    if f.ClearAllPoints then f:ClearAllPoints() end
+    if f.SetPoint then f:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", -10000, -10000) end
+end
+
 function BossW:HideBlizzardBossFrames()
     if blizzardHidden then return end
     blizzardHidden = true
-    local container = _G["BossTargetFrameContainer"] or _G["BossFrameContainer"]
-    if container then
-        container:UnregisterAllEvents()
-        container:Hide()
-        container.Show = function() end
-    end
+    _hideSecure(_G["BossTargetFrameContainer"] or _G["BossFrameContainer"])
     for i = 1, BossW.MAX_BOSS do
         for _, n in ipairs({ "Boss" .. i .. "TargetFrame", "BossTargetFrame" .. i }) do
-            local f = _G[n]
-            if f then
-                f:UnregisterAllEvents()
-                f:Hide()
-                f.Show = function() end
-            end
+            _hideSecure(_G[n])
         end
     end
 end
