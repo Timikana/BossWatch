@@ -6,6 +6,11 @@ versionnage selon [SemVer](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+## [0.7.9] - 2026-05-18
+
+### Corrigé
+- **Taint EditMode `execution tainted by 'BossWatch'`.** L'ouverture du mode édition de l'UI déclenchait une cascade d'erreurs Lua dans `CastingBarFrame:StopFinishAnims` (table `<forbidden>`). Cause : `HideBlizzardBossFrames` écrasait `frame.Show = function() end` et appelait `UnregisterAllEvents()` sur des frames secure Blizzard, ce qui les rend tainted en 12.0+ et propage le taint à tous leurs enfants (dont la CastingBarFrame). Remplacé par un masquage non-destructif (alpha 0 + frame déplacée hors écran) — aucune méthode secure n'est plus modifiée.
+
 ## [0.7.8] - 2026-05-13
 
 ### Modifié
