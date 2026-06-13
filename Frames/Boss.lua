@@ -411,14 +411,14 @@ local function UpdateFrame(frame)
     -- and secret-tagged values (the renderer handles them internally).
     if frame.nameText then
         if db.showName then
-            -- In test mode, prefer _testName — on Classic clients
-            -- UnitName('none') can return a non-nil placeholder string
-            -- ('Unknown' / 'Inconnu') which would shadow the test name.
             local n
-            if frame._testMode then
+            if BossW._sodMode and frame._testMode then
+                -- Classic/TBC: UnitName('none') returns a non-nil placeholder
+                -- ('Unknown'/'Inconnu') so the original 'UnitName or _testName'
+                -- fallback never fires. Read _testName directly in test mode.
                 n = frame._testName or ("Boss " .. (frame.index or "?"))
             else
-                n = UnitName(unit) or ("Boss " .. (frame.index or "?"))
+                n = UnitName(unit) or frame._testName or ("Boss " .. (frame.index or "?"))
             end
             frame.nameText:SetWordWrap(false)
             frame.nameText:SetMaxLines(1)
@@ -441,18 +441,29 @@ local function UpdateFrame(frame)
         if db.portraitPosition ~= "HIDDEN" then
             frame.portrait:Show()
             if frame._testMode then
-                -- Pick textures that exist in EVERY client (Vanilla / TBC /
-                -- Wrath / MoP / Retail). The Achievement_Boss_* art shipped
-                -- with Wrath+ so it's missing on Anniversary (TBC 2.5.x).
-                -- These five Vanilla-era spell/ability icons cover every
-                -- client and visually fit the test-mode bosses.
-                local TEST_PORTRAITS = {
-                    "Interface\\Icons\\Spell_Shadow_DeathPact",        -- Lich King
-                    "Interface\\Icons\\Spell_Shadow_RaiseDead",        -- Kel'Thuzad
-                    "Interface\\Icons\\INV_Misc_Head_Dragon_Black",    -- Onyxia
-                    "Interface\\Icons\\Spell_Fire_Volcano",            -- Ragnaros
-                    "Interface\\Icons\\Ability_Warrior_BattleShout",   -- Illidan stand-in
-                }
+                local TEST_PORTRAITS
+                if BossW._sodMode then
+                    -- Classic / TBC Anniversary: the Achievement_Boss_*
+                    -- art shipped with Wrath+ so SetTexture would fail
+                    -- silently and the portrait would render empty. Use
+                    -- Vanilla-era icons that exist in every client.
+                    TEST_PORTRAITS = {
+                        "Interface\\Icons\\Spell_Shadow_DeathPact",
+                        "Interface\\Icons\\Spell_Shadow_RaiseDead",
+                        "Interface\\Icons\\INV_Misc_Head_Dragon_Black",
+                        "Interface\\Icons\\Spell_Fire_Volcano",
+                        "Interface\\Icons\\Ability_Warrior_BattleShout",
+                    }
+                else
+                    -- Retail / MoP: original thematic Achievement icons.
+                    TEST_PORTRAITS = {
+                        "Interface\\Icons\\Achievement_Boss_LichKing",
+                        "Interface\\Icons\\Achievement_Boss_KelThuzad_01",
+                        "Interface\\Icons\\Achievement_Boss_Onyxia",
+                        "Interface\\Icons\\Achievement_Boss_Ragnaros",
+                        "Interface\\Icons\\Achievement_Boss_Illidan",
+                    }
+                end
                 frame.portrait:SetTexture(TEST_PORTRAITS[frame.index] or TEST_PORTRAITS[1])
             else
                 SetPortraitTexture(frame.portrait, unit)
