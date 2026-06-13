@@ -51,15 +51,15 @@ function O.Pages.sod(page)
     makeSection(page, L["Capacity"], 14, y, "sod.capacity"); y = y - 24
 
     addTooltip(makeDropdown(page, L["Max simultaneous frames"], "maxBossSoD",
-        { { value = 3, label = "3" }, { value = 5, label = "5" }, { value = 8, label = "8" } },
+        { { value = 3, text = "3" }, { value = 5, text = "5" }, { value = 8, text = "8" } },
         14, y),
         L["How many elite NPCs can be displayed at once. Changing this requires a /reload."])
     addTooltip(makeSlider(page, L["Release delay (seconds)"], "sodReleaseDelay", 2, 30, 1, 260, y),
         L["After a tracked unit's nameplate goes missing AND combat ends, BossWatch frees its slot after this many seconds."])
-    y = y - 56
+    y = y - 64
 
     -- ============ ACTIONS ============
-    makeSection(page, L["Actions"], 14, y, "sod.actions"); y = y - 24
+    makeSection(page, L["Actions"], 14, y, "sod.actions"); y = y - 28
 
     local btnReset = CreateFrame("Button", nil, page, "UIPanelButtonTemplate")
     btnReset:SetSize(200, 22); btnReset:SetPoint("TOPLEFT", 14, y)

@@ -527,7 +527,12 @@ local function build()
     -- natively) and Classic Era / SoD (boss1..5 don't exist — see SoD tab).
     if WOW_PROJECT_ID and WOW_PROJECT_MAINLINE and WOW_PROJECT_ID ~= WOW_PROJECT_MAINLINE then
         local banner = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        banner:SetPoint("TOP", panel, "TOP", 0, -32)
+        -- Anchored LEFT (not centered TOP) so it doesn't run under the
+        -- search box at TOPRIGHT. Width is bounded so long messages wrap
+        -- instead of overflowing into the search column.
+        banner:SetPoint("TOPLEFT", panel, "TOPLEFT", 80, -34)
+        banner:SetWidth(420)
+        banner:SetJustifyH("LEFT")
         banner:SetTextColor(1, 0.82, 0)
         local msg
         if BossW._sodMode then
