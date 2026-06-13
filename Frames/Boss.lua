@@ -813,10 +813,15 @@ local function CreateBossFrame(index)
     f.applyClickActions = function()
         if InCombatLockdown() then return false end
         local db = BossW:GetDB()
+        -- Read the unit from the secure attribute rather than the closure: on
+        -- SoD the slot's unit token can change at runtime, so the macro must
+        -- target whatever this frame currently points at, not the value
+        -- captured when the frame was first built.
+        local currentUnit = f:GetAttribute("unit") or unit
         if db.clickActions ~= false then
             f:SetAttribute("shift-type1", "macro")
             f:SetAttribute("shift-macrotext1",
-                ("/run local i=GetRaidTargetIndex('%s') or 0; if i>=8 then i=0 end; SetRaidTarget('%s', i+1)"):format(unit, unit))
+                ("/run local i=GetRaidTargetIndex('%s') or 0; if i>=8 then i=0 end; SetRaidTarget('%s', i+1)"):format(currentUnit, currentUnit))
             f:SetAttribute("ctrl-type1", "focus")
         else
             f:SetAttribute("shift-type1", nil)
