@@ -411,7 +411,15 @@ local function UpdateFrame(frame)
     -- and secret-tagged values (the renderer handles them internally).
     if frame.nameText then
         if db.showName then
-            local n = UnitName(unit) or frame._testName or ("Boss " .. (frame.index or "?"))
+            -- In test mode, prefer _testName — on Classic clients
+            -- UnitName('none') can return a non-nil placeholder string
+            -- ('Unknown' / 'Inconnu') which would shadow the test name.
+            local n
+            if frame._testMode then
+                n = frame._testName or ("Boss " .. (frame.index or "?"))
+            else
+                n = UnitName(unit) or ("Boss " .. (frame.index or "?"))
+            end
             frame.nameText:SetWordWrap(false)
             frame.nameText:SetMaxLines(1)
             local maxLen = db.nameMaxLength or 0
@@ -433,12 +441,17 @@ local function UpdateFrame(frame)
         if db.portraitPosition ~= "HIDDEN" then
             frame.portrait:Show()
             if frame._testMode then
+                -- Pick textures that exist in EVERY client (Vanilla / TBC /
+                -- Wrath / MoP / Retail). The Achievement_Boss_* art shipped
+                -- with Wrath+ so it's missing on Anniversary (TBC 2.5.x).
+                -- These five Vanilla-era spell/ability icons cover every
+                -- client and visually fit the test-mode bosses.
                 local TEST_PORTRAITS = {
-                    "Interface\\Icons\\Achievement_Boss_LichKing",
-                    "Interface\\Icons\\Achievement_Boss_KelThuzad_01",
-                    "Interface\\Icons\\Achievement_Boss_Onyxia",
-                    "Interface\\Icons\\Achievement_Boss_Ragnaros",
-                    "Interface\\Icons\\Achievement_Boss_Illidan",
+                    "Interface\\Icons\\Spell_Shadow_DeathPact",        -- Lich King
+                    "Interface\\Icons\\Spell_Shadow_RaiseDead",        -- Kel'Thuzad
+                    "Interface\\Icons\\INV_Misc_Head_Dragon_Black",    -- Onyxia
+                    "Interface\\Icons\\Spell_Fire_Volcano",            -- Ragnaros
+                    "Interface\\Icons\\Ability_Warrior_BattleShout",   -- Illidan stand-in
                 }
                 frame.portrait:SetTexture(TEST_PORTRAITS[frame.index] or TEST_PORTRAITS[1])
             else
