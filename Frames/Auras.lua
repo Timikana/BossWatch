@@ -334,8 +334,8 @@ end
 local eventFrame = CreateFrame("Frame")
 eventFrame:RegisterEvent("UNIT_AURA")
 eventFrame:SetScript("OnEvent", function(_, event, unit)
-    if not unit or not unit:match("^boss%d$") then return end
-    local idx = tonumber(unit:sub(5))
+    local idx = BossW.SlotProvider:EventFilter(unit)
+    if not idx then return end
     local frame = BossW.BossFrames and BossW.BossFrames[idx]
     if frame then BossW.UpdateAuras(frame) end
 end)

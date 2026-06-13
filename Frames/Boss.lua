@@ -797,7 +797,7 @@ BossW.RefreshAll = RefreshAll
 -- ============================================================
 local function CreateBossFrame(index)
     local name = "BossWatchFrame" .. index
-    local unit = "boss" .. index
+    local unit = BossW.SlotProvider:GetUnit(index)
 
     local f = CreateFrame("Button", name, BossW.BossContainer, "SecureUnitButtonTemplate")
     f:SetAttribute("unit", unit)
@@ -827,7 +827,7 @@ local function CreateBossFrame(index)
     end
     f.applyClickActions()
 
-    RegisterStateDriver(f, "visibility", "[@" .. unit .. ",exists]show;hide")
+    RegisterStateDriver(f, "visibility", BossW.SlotProvider:GetVisibilityDriver(index))
 
     local bg = f:CreateTexture(nil, "BACKGROUND")
     bg:SetAllPoints(f)

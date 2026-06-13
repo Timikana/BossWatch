@@ -506,9 +506,9 @@ function BossW:DumpAuras(unit)
         units = { unit }
     else
         units = {}
-        for i = 1, BossW.MAX_BOSS do
-            local u = "boss" .. i
-            if UnitExists(u) then units[#units + 1] = u end
+        for i = 1, BossW.SlotProvider:GetMaxSlots() do
+            local u = BossW.SlotProvider:GetUnit(i)
+            if u and UnitExists(u) then units[#units + 1] = u end
         end
         if #units == 0 then units = { "target" } end
     end
