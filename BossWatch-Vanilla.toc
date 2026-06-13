@@ -1,0 +1,53 @@
+## Interface: 11507
+## Title: BossWatch
+## Notes: Custom boss target frames for WoW Classic Era / Season of Discovery
+## Author: Timikana
+## Version: 0.7.9
+## IconTexture: Interface\Icons\Achievement_Boss_Argaloth
+## SavedVariables: BossWatchDB
+## X-Curse-Project-ID: 1535856
+## X-Wago-ID: mKODekGx
+
+# Libs
+Libs\LibStub\LibStub.lua
+Libs\CallbackHandler-1.0\CallbackHandler-1.0.xml
+Libs\LibSharedMedia-3.0\LibSharedMedia-3.0.xml
+Libs\LibDataBroker-1.1\LibDataBroker-1.1.lua
+Libs\LibDBIcon-1.0\LibDBIcon-1.0.lua
+
+# Core
+BossWatch.lua
+
+# Locales
+Locales\enUS.lua
+Locales\frFR.lua
+Locales\deDE.lua
+Locales\esES.lua
+Locales\itIT.lua
+Locales\ptBR.lua
+
+# Frames
+# Order is critical:
+#   1. SlotProvider.lua sets up the trivial provider (returns "boss"..i).
+#   2. SodSlotProvider.lua OVERRIDES it with a target+nameplate scanner —
+#      THIS is the file that makes the addon work on Classic Era, where
+#      boss1..5 unit IDs don't exist.
+#   3. Boss/CastBar/Auras then capture BossW.MAX_BOSS as upvalue and call
+#      BossW.SlotProvider:* through the indirection.
+Frames\SlotProvider.lua
+Frames\SodSlotProvider.lua
+Frames\Boss.lua
+Frames\CastBar.lua
+Frames\Auras.lua
+
+# Options panel
+Options\Widgets.lua
+Options\Panel.lua
+Options\Pages\Layout.lua
+Options\Pages\Bars.lua
+Options\Pages\Cast.lua
+Options\Pages\Text.lua
+Options\Pages\Raid.lua
+Options\Pages\Auras.lua
+Options\Pages\Profiles.lua
+Options\Pages\About.lua

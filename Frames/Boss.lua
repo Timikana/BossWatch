@@ -959,6 +959,11 @@ end
 -- ============================================================
 -- INIT
 -- ============================================================
+-- Queue of slot-attribute changes deferred because we were in combat.
+-- Flushed on PLAYER_REGEN_ENABLED. Only meaningful when the SoD provider
+-- is active — on Retail/MoP the slot ↔ unit mapping never changes.
+local _pendingSlotUnits = {}
+
 function BossW:EnsureCreated()
     if BossW.BossContainer then return end
     local db = BossW:GetDB()
@@ -986,6 +991,35 @@ function BossW:EnsureCreated()
     for i = 1, MAX_BOSS do BossW.BossFrames[i] = CreateBossFrame(i) end
     ApplyLayout()
     if db.hideBlizzard then BossW:HideBlizzardBossFrames() end
+
+    -- Subscribe once to slot reassignments. On Retail / MoP the trivial
+    -- provider never fires the callback, so this is a no-op there. On SoD
+    -- the SodSlotProvider fires it whenever a slot picks up or drops a
+    -- nameplate token, and the handler re-points the matching BossFrame.
+    if BossW.SlotProvider and BossW.SlotProvider.OnSlotChanged then
+        BossW.SlotProvider:OnSlotChanged(function(slotIndex, oldUnit, newUnit)
+            local f = BossW.BossFrames[slotIndex]
+            if not f then return end
+            f.unit = newUnit
+            -- Re-register the state driver so visibility tracks the new
+            -- token. RegisterStateDriver is NOT restricted in combat —
+            -- safe to call here.
+            RegisterStateDriver(f, "visibility",
+                BossW.SlotProvider:GetVisibilityDriver(slotIndex))
+            -- SetAttribute('unit', ...) IS restricted in combat. Queue and
+            -- flush on PLAYER_REGEN_ENABLED.
+            if InCombatLockdown() then
+                _pendingSlotUnits[slotIndex] = newUnit or false
+            else
+                f:SetAttribute("unit", newUnit or "none")
+                if f.applyClickActions then f.applyClickActions() end
+            end
+            -- Cast bar: the old unit may have been mid-cast. Drop it.
+            if f.castBar and BossW.ClearCast then BossW.ClearCast(f) end
+            -- Auras: force a refresh against the new unit.
+            if newUnit and BossW.UpdateAuras then BossW.UpdateAuras(f) end
+        end)
+    end
 end
 
 -- ============================================================
@@ -1212,6 +1246,19 @@ eventFrame:SetScript("OnEvent", function(_, event)
             if f then applyTargetHighlight(f) end
         end
         return
+    end
+    if event == "PLAYER_REGEN_ENABLED" then
+        -- Flush any slot unit changes that were blocked by combat lockdown.
+        if next(_pendingSlotUnits) then
+            for slotIndex, newUnit in pairs(_pendingSlotUnits) do
+                local f = BossW.BossFrames[slotIndex]
+                if f then
+                    f:SetAttribute("unit", newUnit or "none")
+                    if f.applyClickActions then f.applyClickActions() end
+                end
+                _pendingSlotUnits[slotIndex] = nil
+            end
+        end
     end
     if event == "PLAYER_REGEN_ENABLED" and _pendingLayout then
         _pendingLayout = false

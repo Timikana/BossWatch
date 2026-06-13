@@ -103,6 +103,9 @@ local function ClearCast(frame)
     if not cb then return end
     cb._casting = false; cb._channeling = false; cb:Hide()
 end
+-- Exposed so the SoD slot-changed handler in Frames/Boss.lua can drop the
+-- old unit's in-flight cast when a slot is reassigned to a different mob.
+BossW.ClearCast = ClearCast
 
 local function StartCast(frame, channeling)
     local cb = frame.castBar or CreateCastBar(frame)
