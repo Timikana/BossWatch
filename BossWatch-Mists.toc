@@ -27,6 +27,8 @@ Locales\itIT.lua
 Locales\ptBR.lua
 
 # Frames
+# SlotProvider MUST load before Boss/CastBar/Auras.
+Frames\SlotProvider.lua
 Frames\Boss.lua
 Frames\CastBar.lua
 Frames\Auras.lua

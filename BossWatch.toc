@@ -28,6 +28,11 @@ Locales\itIT.lua
 Locales\ptBR.lua
 
 # Frames
+# SlotProvider MUST load before Boss/CastBar/Auras (they capture BossW.MAX_BOSS
+# as an upvalue and call BossW.SlotProvider:GetUnit() instead of building
+# "boss"..i themselves). On Vanilla/SoD, BossWatch-Vanilla.toc loads
+# Frames\SodSlotProvider.lua AFTER this to override the trivial provider.
+Frames\SlotProvider.lua
 Frames\Boss.lua
 Frames\CastBar.lua
 Frames\Auras.lua
