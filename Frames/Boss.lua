@@ -917,13 +917,17 @@ local function CreateBossFrame(index)
     pwText:SetPoint("RIGHT", pw, "RIGHT", -2, 0)
     f.powerText = pwText
 
-    -- Name + health text
-    local nameText = hp:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    -- Name + health text. Parented to the ABSORB bar (frame-level hp+4)
+    -- rather than hp itself, so the text renders ABOVE the shield fill —
+    -- otherwise the name (or hp text) sitting on the right side of the
+    -- bar gets covered when the absorb is large enough. Anchors still
+    -- reference hp positions so the visible layout is unchanged.
+    local nameText = abs:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     nameText:SetPoint("LEFT", hp, "LEFT", 4, 0)
     nameText:SetTextColor(1, 1, 1)
     f.nameText = nameText
 
-    local hpText = hp:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local hpText = abs:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     hpText:SetPoint("RIGHT", hp, "RIGHT", -4, 0)
     hpText:SetTextColor(1, 1, 1)
     f.healthText = hpText
