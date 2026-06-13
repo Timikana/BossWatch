@@ -96,6 +96,17 @@ BossW.Defaults = {
     aurasShowStacks = true, aurasStackAnchor = "BOTTOMRIGHT", aurasStackX = 0, aurasStackY = 0,
     aurasShowTimer = true, aurasTimerPlacement = "BELOW", aurasTimerX = 0, aurasTimerY = 0,
     aurasTooltip = true,
+
+    -- SoD / Classic Era detection (only consumed by Frames/SodSlotProvider.lua,
+    -- which is loaded ONLY by BossWatch-Vanilla.toc — on Retail/MoP these
+    -- keys are seeded into the profile but never read).
+    maxBossSoD             = 5,     -- 3, 5 or 8
+    sodIncludeWorldBosses  = true,  -- UnitClassification == "worldboss"
+    sodIncludeRareElites   = true,  -- UnitClassification == "rareelite"
+    sodIncludeElites       = true,  -- UnitClassification == "elite"
+    sodIncludeRares        = false, -- UnitClassification == "rare" (silver, non-elite)
+    sodReleaseDelay        = 5,     -- seconds out of combat before freeing a slot
+                                    -- whose unit token has gone missing
 }
 
 -- ============================================================
