@@ -52,3 +52,4 @@ Options\Pages\Raid.lua
 Options\Pages\Auras.lua
 Options\Pages\Profiles.lua
 Options\Pages\About.lua
+Options\Pages\SoD.lua

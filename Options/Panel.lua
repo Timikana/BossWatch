@@ -583,6 +583,10 @@ local function build()
     pages.auras    = buildPage("auras",    O.Pages.auras)
     pages.profiles = buildPage("profiles", O.Pages.profiles)
     pages.about    = buildPage("about",    O.Pages.about)
+    -- SoD page is only built (and tab only shown) on Classic Era / SoD.
+    if _G.WOW_PROJECT_ID == _G.WOW_PROJECT_CLASSIC and O.Pages.sod then
+        pages.sod  = buildPage("sod",      O.Pages.sod)
+    end
     -- Changelog is no longer a tab — it's a section at the bottom of About.
 
     -- Hidden "search results" page — not in the tab list. When the search box
@@ -737,6 +741,9 @@ local function build()
         { id = "profiles", label = L["Profiles"] },
         { id = "about",    label = L["About"] },
     }
+    if _G.WOW_PROJECT_ID == _G.WOW_PROJECT_CLASSIC then
+        table.insert(tabs, #tabs, { id = "sod", label = L["Classic / SoD"] })
+    end
     local tabBtns = {}
     local function selectTab(id)
         -- If a search is active, clear it before switching (which restores the
