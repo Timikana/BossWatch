@@ -53,6 +53,8 @@ L["Frees every slot manually. Useful if a slot is stuck on a despawned mob."] =
     "Libère manuellement chaque slot. Utile si un slot reste bloqué sur un mob disparu."
 L["enable enemy nameplates (Ctrl-V) for SoD elite auto-detection"] =
     "active les nameplates ennemies (Ctrl-V) pour la détection auto des élites SoD"
+L["⚠ Classic Era / SoD build — bosses are detected via target + nameplates (see the Classic / SoD tab). Report bugs!"] =
+    "⚠ Build Classic Era / SoD — les boss sont détectés via la cible + nameplates (voir l'onglet Classic / SoD). Reporte les bugs !"
 
 -- ============================================================
 -- PROFILES PAGE

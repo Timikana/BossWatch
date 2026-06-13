@@ -499,14 +499,20 @@ local function build()
     addTooltip(searchBox, L["Filter the panel: type any keyword from a label or tooltip. Sections without a match are auto-collapsed."])
     addTooltip(searchClear, L["Clear the search."])
 
-    -- Classic build banner — only visible on non-retail clients (MoP Classic etc.).
-    -- The banner sits below the title bar and warns that the UI hasn't been
-    -- fully tested in dungeon/raid encounters yet on this client.
+    -- Classic build banner — only visible on non-retail clients.
+    -- Message differs between MoP/Cata/Wrath/TBC (still uses boss1..5 unit IDs
+    -- natively) and Classic Era / SoD (boss1..5 don't exist — see SoD tab).
     if WOW_PROJECT_ID and WOW_PROJECT_MAINLINE and WOW_PROJECT_ID ~= WOW_PROJECT_MAINLINE then
         local banner = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         banner:SetPoint("TOP", panel, "TOP", 0, -32)
         banner:SetTextColor(1, 0.82, 0)
-        banner:SetText("|cffffd100" .. L["⚠ Classic build — UI not fully tested in encounters yet, please report bugs."] .. "|r")
+        local msg
+        if WOW_PROJECT_ID == WOW_PROJECT_CLASSIC then
+            msg = L["⚠ Classic Era / SoD build — bosses are detected via target + nameplates (see the Classic / SoD tab). Report bugs!"]
+        else
+            msg = L["⚠ Classic build — UI not fully tested in encounters yet, please report bugs."]
+        end
+        banner:SetText("|cffffd100" .. msg .. "|r")
     end
 
     local pageHolder = CreateFrame("Frame", nil, panel)
