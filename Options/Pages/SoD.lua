@@ -2,11 +2,12 @@ local addonName, BossW = ...
 local L = BossW.L
 local O = BossW.Options
 
-local addTooltip   = O.addTooltip
-local makeSection  = O.makeSection
-local makeCheck    = O.makeCheck
-local makeDropdown = O.makeDropdown
-local makeSlider   = O.makeSlider
+local addTooltip          = O.addTooltip
+local makeSection         = O.makeSection
+local makeCheck           = O.makeCheck
+local makeDropdown        = O.makeDropdown
+local makeSlider          = O.makeSlider
+local _registerInSection  = O._registerInSection
 
 local CreateFrame = CreateFrame
 local _G          = _G
@@ -65,9 +66,6 @@ function O.Pages.sod(page)
     btnReset:SetSize(200, 22); btnReset:SetPoint("TOPLEFT", 14, y)
     btnReset:SetText(L["Clear all detected slots"])
     btnReset:SetScript("OnClick", function()
-        -- Best-effort: trigger PLAYER_ENTERING_WORLD-equivalent flush by
-        -- iterating frames and clearing their unit attribute. The next
-        -- nameplate event will refill slots from scratch.
         for i = 1, BossW.MAX_BOSS do
             local f = BossW.BossFrames and BossW.BossFrames[i]
             if f and not InCombatLockdown() then
@@ -77,4 +75,9 @@ function O.Pages.sod(page)
         print("|cffeda55fBossWatch:|r " .. L["Slots cleared — they will refill from current target / nameplates."])
     end)
     addTooltip(btnReset, L["Frees every slot manually. Useful if a slot is stuck on a despawned mob."])
+    -- Register the button as a child of the Actions section so the section's
+    -- UpdateNaturalHeight reaches it and grows the container properly.
+    -- Without this the section stays collapsed-height and its divider line
+    -- ends up overlapping the button visually.
+    if _registerInSection then _registerInSection(btnReset, "sod.actions.reset") end
 end
