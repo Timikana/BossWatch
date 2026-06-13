@@ -6,6 +6,13 @@ versionnage selon [SemVer](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+### Ajouté
+- **Support Classic Era / Season of Discovery.** Un troisième TOC (`BossWatch-Vanilla.toc`, Interface 11507) installe maintenant l'addon sur le client Vanilla 1.15.x. Sur ce client, les identifiants d'unité `boss1..5` n'existent pas (introduits en Cataclysm) — BossWatch détecte les ennemis élite/world-boss/rare-elite en scannant la cible, le survol et les nameplates ennemies (`UnitClassification`), et les assigne dynamiquement aux frames. Active les nameplates ennemies (Ctrl-V) pour que la détection auto fonctionne. Stable slot IDs : un slot reste assigné à son mob jusqu'à kill ou changement de zone (pas de saut visuel pendant les adds). Capacité configurable (3/5/8 frames).
+- **Nouvel onglet "Classic / SoD"** dans le panneau d'options (visible uniquement sur Classic Era / SoD) : toggles d'inclusion par classification (world bosses, élites rares, élites, rares non-élite), capacité max, délai de libération de slot, bouton de reset manuel.
+
+### Interne
+- **Couche d'abstraction `BossW.SlotProvider`** entre les BossFrames et les unit tokens. Sur Retail / Midnight / MoP Classic le provider trivial retourne `"boss"..i` (comportement bit-à-bit identique à avant). Sur Vanilla/SoD un provider override gère les slots virtuels. Permet de supporter le nouveau client sans dupliquer Frames/Boss.lua.
+
 ## [0.7.9] - 2026-05-18
 
 ### Corrigé
