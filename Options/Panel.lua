@@ -507,7 +507,7 @@ local function build()
         banner:SetPoint("TOP", panel, "TOP", 0, -32)
         banner:SetTextColor(1, 0.82, 0)
         local msg
-        if WOW_PROJECT_ID == WOW_PROJECT_CLASSIC then
+        if BossW._sodMode then
             msg = L["⚠ Classic Era / SoD build — bosses are detected via target + nameplates (see the Classic / SoD tab). Report bugs!"]
         else
             msg = L["⚠ Classic build — UI not fully tested in encounters yet, please report bugs."]
@@ -589,8 +589,9 @@ local function build()
     pages.auras    = buildPage("auras",    O.Pages.auras)
     pages.profiles = buildPage("profiles", O.Pages.profiles)
     pages.about    = buildPage("about",    O.Pages.about)
-    -- SoD page is only built (and tab only shown) on Classic Era / SoD.
-    if _G.WOW_PROJECT_ID == _G.WOW_PROJECT_CLASSIC and O.Pages.sod then
+    -- SoD page is only built (and tab only shown) when the SodSlotProvider
+    -- is loaded — i.e. on any client without native boss1..5 unit IDs.
+    if BossW._sodMode and O.Pages.sod then
         pages.sod  = buildPage("sod",      O.Pages.sod)
     end
     -- Changelog is no longer a tab — it's a section at the bottom of About.
@@ -747,7 +748,7 @@ local function build()
         { id = "profiles", label = L["Profiles"] },
         { id = "about",    label = L["About"] },
     }
-    if _G.WOW_PROJECT_ID == _G.WOW_PROJECT_CLASSIC then
+    if BossW._sodMode then
         table.insert(tabs, #tabs, { id = "sod", label = L["Classic / SoD"] })
     end
     local tabBtns = {}

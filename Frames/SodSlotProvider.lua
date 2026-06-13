@@ -45,6 +45,11 @@ local CFG = _readDB()
 -- by the .toc load order).
 BossW.MAX_BOSS = math.max(BossW.MAX_BOSS or 5, CFG.maxSlots)
 
+-- Marker checked by Options/Panel.lua to decide whether to show the
+-- Classic / SoD tab. True on any client where this file is loaded —
+-- Classic Era / SoD, and TBC Anniversary (both lack boss1..5 unit IDs).
+BossW._sodMode = true
+
 -- ============================================================
 -- Slot state
 -- ============================================================

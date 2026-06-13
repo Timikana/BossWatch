@@ -1,12 +1,17 @@
-## Interface: 11507, 11508, 11509
+## Interface: 20504, 20505, 20506
 ## Title: BossWatch
-## Notes: Custom boss target frames for WoW Classic Era / Season of Discovery
+## Notes: Custom boss target frames for WoW TBC Classic / Anniversary
 ## Author: Timikana
 ## Version: 0.8.0
 ## IconTexture: Interface\Icons\Achievement_Boss_Argaloth
 ## SavedVariables: BossWatchDB
 ## X-Curse-Project-ID: 1535856
 ## X-Wago-ID: mKODekGx
+
+# TBC Classic 2.5.x and the Anniversary product (also 2.5.x) do NOT expose
+# boss1..boss5 unit IDs — those landed in Cataclysm 4.0. So this TOC loads
+# the same Vanilla-style SodSlotProvider that scans target + nameplates,
+# and the new Classic / SoD options tab applies here as well.
 
 # Libs
 Libs\LibStub\LibStub.lua
@@ -27,13 +32,6 @@ Locales\itIT.lua
 Locales\ptBR.lua
 
 # Frames
-# Order is critical:
-#   1. SlotProvider.lua sets up the trivial provider (returns "boss"..i).
-#   2. SodSlotProvider.lua OVERRIDES it with a target+nameplate scanner —
-#      THIS is the file that makes the addon work on Classic Era, where
-#      boss1..5 unit IDs don't exist.
-#   3. Boss/CastBar/Auras then capture BossW.MAX_BOSS as upvalue and call
-#      BossW.SlotProvider:* through the indirection.
 Frames\SlotProvider.lua
 Frames\SodSlotProvider.lua
 Frames\Boss.lua

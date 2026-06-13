@@ -14,13 +14,11 @@ local _G          = _G
 function O.Pages.sod(page)
     local y = -8
 
-    -- This page is registered on every TOC for parity, but only the Classic
-    -- Era / SoD client actually populates it. Other clients see an empty
-    -- placeholder explaining why. The tab itself is gated in Panel.lua and
-    -- only appears on Classic — this guard is the second line of defence.
-    local isClassicEra = _G.WOW_PROJECT_ID == _G.WOW_PROJECT_CLASSIC
-
-    if not isClassicEra then
+    -- This page is registered on every TOC for parity, but only loaded on
+    -- clients where SodSlotProvider is active (Vanilla, TBC Anniversary).
+    -- The tab itself is gated in Panel.lua — this guard is the second
+    -- line of defence.
+    if not BossW._sodMode then
         local note = page:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
         note:SetPoint("TOPLEFT", 14, y)
         note:SetWidth(680); note:SetJustifyH("LEFT")
