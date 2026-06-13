@@ -349,6 +349,29 @@ local function makeTab(parent, id, label, idx, prevTab)
     tab.id = id
     if PanelTemplates_TabResize then PanelTemplates_TabResize(tab, 0) end
     if TAB_TOOLTIPS[id] then addTooltip(tab, TAB_TOOLTIPS[id]) end
+
+    -- On Classic Era / TBC Anniversary the PanelTabButtonTemplate atlas
+    -- regions render either invisibly or as bare text, so the user sees a
+    -- string of tab labels with nothing around them. Add a manual dark
+    -- backdrop + thin border that sits BEHIND the template textures — on
+    -- Retail it's hidden by them, on Classic it gives the tabs a visible
+    -- button shape.
+    local bg = tab:CreateTexture(nil, "BACKGROUND", nil, -2)
+    bg:SetPoint("TOPLEFT", 2, -3)
+    bg:SetPoint("BOTTOMRIGHT", -2, 3)
+    bg:SetColorTexture(0.08, 0.08, 0.08, 0.85)
+    tab._fallbackBg = bg
+
+    local edge = tab:CreateTexture(nil, "BACKGROUND", nil, -1)
+    edge:SetPoint("TOPLEFT", 1, -2)
+    edge:SetPoint("BOTTOMRIGHT", -1, 2)
+    edge:SetColorTexture(0.35, 0.28, 0.10, 1) -- subtle gold-ish edge
+    tab._fallbackEdge = edge
+
+    -- Make sure the label text reads clearly above the fallback bg.
+    local fs = tab:GetFontString()
+    if fs then fs:SetDrawLayer("OVERLAY") end
+
     return tab
 end
 

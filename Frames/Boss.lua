@@ -797,7 +797,11 @@ BossW.RefreshAll = RefreshAll
 -- ============================================================
 local function CreateBossFrame(index)
     local name = "BossWatchFrame" .. index
-    local unit = BossW.SlotProvider:GetUnit(index)
+    -- On SoD an empty slot returns nil — fall back to a harmless placeholder
+    -- so SecureUnitButtonTemplate doesn't choke on a nil unit attribute.
+    -- The SlotProvider will SetAttribute('unit', realUnit) once a mob is
+    -- assigned, via the OnSlotChanged callback wired in EnsureCreated.
+    local unit = BossW.SlotProvider:GetUnit(index) or "none"
 
     local f = CreateFrame("Button", name, BossW.BossContainer, "SecureUnitButtonTemplate")
     f:SetAttribute("unit", unit)
@@ -1210,7 +1214,12 @@ function BossW:SetTestMode(count)
                 _testNextCast[i] = nil
                 if f.castBar then f.castBar:Hide() end
                 if not InCombatLockdown() then
-                    RegisterStateDriver(f, "visibility", "[@" .. f.unit .. ",exists]show;hide")
+                    -- Route through the provider so on SoD (where f.unit may
+                    -- be nil because no slot is currently assigned) we get
+                    -- the right driver ("hide") instead of a string-concat
+                    -- error on nil.
+                    RegisterStateDriver(f, "visibility",
+                        BossW.SlotProvider:GetVisibilityDriver(f.index))
                 end
             end
         end

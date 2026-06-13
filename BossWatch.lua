@@ -165,8 +165,9 @@ local function ensureProfilesDB()
     BossWatchDB.profiles = BossWatchDB.profiles or {}
     if not BossWatchDB.profiles.Default then BossWatchDB.profiles.Default = {} end
     BossWatchDB.charBindings = BossWatchDB.charBindings or {}
-    -- Account-wide minimap state (NOT per-profile)
-    BossWatchDB.minimap = BossWatchDB.minimap or { hide = true }
+    -- Account-wide minimap state (NOT per-profile). Default = visible so new
+    -- users discover the addon entry point without needing to read the README.
+    BossWatchDB.minimap = BossWatchDB.minimap or { hide = false }
     -- Account-wide tracker for "NEW" badge dismissal (NOT per-profile —
     -- once a user has seen a feature, the badge stays gone everywhere)
     BossWatchDB.seenFeatures = BossWatchDB.seenFeatures or {}
@@ -589,6 +590,9 @@ init:SetScript("OnEvent", function()
     if BossW.ApplyFonts then BossW:ApplyFonts() end
     if BossW.RegisterMinimapIcon then BossW:RegisterMinimapIcon() end
     if BossW.RegisterBlizzardSettings then BossW:RegisterBlizzardSettings() end
-    print(format(BossW.L["|cffeda55fBossWatch|r v%s loaded — type |cffffff00/bossw|r for options"],
-        C_AddOns and C_AddOns.GetAddOnMetadata(addonName, "Version") or "?"))
+    local v = C_AddOns and C_AddOns.GetAddOnMetadata(addonName, "Version") or "?"
+    print(format("|cffeda55fBossWatch|r v%s " .. (BossW.L["loaded"] or "loaded") ..
+        " — |cffffff00/bossw|r " .. (BossW.L["(options)"] or "(options)") ..
+        ", |cffffff00/bossw test 5|r " .. (BossW.L["(preview)"] or "(preview)") ..
+        ", |cffffff00/bossw mover|r " .. (BossW.L["(move frames)"] or "(move frames)"), v))
 end)
