@@ -12,6 +12,7 @@ versionnage selon [SemVer](https://semver.org/lang/fr/).
 
 ### Interne
 - **Couche d'abstraction `BossW.SlotProvider`** entre les BossFrames et les unit tokens. Sur Retail / Midnight / MoP Classic le provider trivial retourne `"boss"..i` (comportement bit-à-bit identique à avant). Sur Vanilla/SoD un provider override gère les slots virtuels. Permet de supporter le nouveau client sans dupliquer Frames/Boss.lua.
+- **Tracking combat-log des auras du joueur** (`Frames/MyAuras.lua`) — sur Retail Midnight 12.0+, les champs `isFromPlayerOrPlayerPet` et `sourceUnit` des auras sont secret-tagged sur les unités hostiles, ce qui rendait le filtre **Auras → Source → "Only mine"** peu fiable. Le nouveau tracker écoute `COMBAT_LOG_EVENT_UNFILTERED` et maintient une table `(GUID cible, spellID) → applied` filtrée sur `COMBATLOG_OBJECT_AFFILIATION_MINE` — les données combat-log ne sont jamais secret-tagged, donc le filtre est maintenant fiable à 100% sur Retail. Fallback sur les champs Blizzard préservé pour Classic / SoD / TBC où il n'y a pas de secret-tagging.
 
 ## [0.7.9] - 2026-05-18
 
