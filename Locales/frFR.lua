@@ -16,6 +16,45 @@ L["Auras"]       = "Auras"
 L["Profiles"]    = "Profils"
 L["About"]       = "À propos"
 L["Changelog"]   = "Nouveautés"
+L["Classic / SoD"] = "Classic / SoD"
+
+-- ============================================================
+-- SoD page
+-- ============================================================
+L["Detection"] = "Détection"
+L["Capacity"]  = "Capacité"
+L["This tab only applies to Classic Era / Season of Discovery."] =
+    "Cet onglet ne s'applique qu'à Classic Era / Saison de Découverte."
+L["On Classic Era / SoD, boss1..5 unit IDs don't exist. BossWatch fills the frames by scanning your target, your mouseover and visible enemy nameplates. Enable enemy nameplates (Ctrl-V) for auto-detection to work."] =
+    "Sur Classic Era / SoD, les identifiants d'unité boss1..5 n'existent pas. BossWatch remplit les frames en scannant ta cible, ton survol et les nameplates ennemies visibles. Active les nameplates ennemies (Ctrl-V) pour que la détection automatique fonctionne."
+L["Include world bosses"]     = "Inclure les world bosses"
+L["Track NPCs classified by the game as 'worldboss' (large open-world bosses)."] =
+    "Suit les PNJ classés 'worldboss' par le jeu (gros boss en monde ouvert)."
+L["Include rare elites"]      = "Inclure les élites rares"
+L["Track NPCs classified as 'rareelite' (silver dragon + elite border)."] =
+    "Suit les PNJ classés 'rareelite' (dragon argenté + bordure élite)."
+L["Include elites"]           = "Inclure les élites"
+L["Track NPCs classified as 'elite' (the standard elite gold border). Most raid/dungeon bosses qualify here."] =
+    "Suit les PNJ classés 'elite' (bordure dorée standard). La plupart des boss de raid/donjon entrent ici."
+L["Include rares (non-elite)"] = "Inclure les rares (non-élite)"
+L["Track NPCs classified as 'rare' (silver dragon, no elite border). OFF by default — adds noise from regular open-world rares."] =
+    "Suit les PNJ classés 'rare' (dragon argenté, sans bordure élite). Désactivé par défaut — ajoute du bruit avec les rares classiques du monde ouvert."
+L["Max simultaneous frames"]  = "Frames simultanées max"
+L["How many elite NPCs can be displayed at once. Changing this requires a /reload."] =
+    "Combien de PNJ élite peuvent s'afficher en même temps. Changer cette valeur nécessite un /reload."
+L["Release delay (seconds)"]  = "Délai de libération (secondes)"
+L["After a tracked unit's nameplate goes missing AND combat ends, BossWatch frees its slot after this many seconds."] =
+    "Quand la nameplate d'un PNJ suivi disparaît ET que le combat se termine, BossWatch libère son slot après ce délai."
+L["Actions"]                  = "Actions"
+L["Clear all detected slots"] = "Vider tous les slots détectés"
+L["Slots cleared — they will refill from current target / nameplates."] =
+    "Slots vidés — ils se rempliront à partir de la cible / nameplates actuelles."
+L["Frees every slot manually. Useful if a slot is stuck on a despawned mob."] =
+    "Libère manuellement chaque slot. Utile si un slot reste bloqué sur un mob disparu."
+L["enable enemy nameplates (Ctrl-V) for SoD elite auto-detection"] =
+    "active les nameplates ennemies (Ctrl-V) pour la détection auto des élites SoD"
+L["⚠ Classic Era / SoD build — bosses are detected via target + nameplates (see the Classic / SoD tab). Report bugs!"] =
+    "⚠ Build Classic Era / SoD — les boss sont détectés via la cible + nameplates (voir l'onglet Classic / SoD). Reporte les bugs !"
 
 -- ============================================================
 -- PROFILES PAGE

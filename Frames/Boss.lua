@@ -411,7 +411,15 @@ local function UpdateFrame(frame)
     -- and secret-tagged values (the renderer handles them internally).
     if frame.nameText then
         if db.showName then
-            local n = UnitName(unit) or frame._testName or ("Boss " .. (frame.index or "?"))
+            local n
+            if BossW._sodMode and frame._testMode then
+                -- Classic/TBC: UnitName('none') returns a non-nil placeholder
+                -- ('Unknown'/'Inconnu') so the original 'UnitName or _testName'
+                -- fallback never fires. Read _testName directly in test mode.
+                n = frame._testName or ("Boss " .. (frame.index or "?"))
+            else
+                n = UnitName(unit) or frame._testName or ("Boss " .. (frame.index or "?"))
+            end
             frame.nameText:SetWordWrap(false)
             frame.nameText:SetMaxLines(1)
             local maxLen = db.nameMaxLength or 0
@@ -433,13 +441,29 @@ local function UpdateFrame(frame)
         if db.portraitPosition ~= "HIDDEN" then
             frame.portrait:Show()
             if frame._testMode then
-                local TEST_PORTRAITS = {
-                    "Interface\\Icons\\Achievement_Boss_LichKing",
-                    "Interface\\Icons\\Achievement_Boss_KelThuzad_01",
-                    "Interface\\Icons\\Achievement_Boss_Onyxia",
-                    "Interface\\Icons\\Achievement_Boss_Ragnaros",
-                    "Interface\\Icons\\Achievement_Boss_Illidan",
-                }
+                local TEST_PORTRAITS
+                if BossW._sodMode then
+                    -- Classic / TBC Anniversary: the Achievement_Boss_*
+                    -- art shipped with Wrath+ so SetTexture would fail
+                    -- silently and the portrait would render empty. Use
+                    -- Vanilla-era icons that exist in every client.
+                    TEST_PORTRAITS = {
+                        "Interface\\Icons\\Spell_Shadow_DeathPact",
+                        "Interface\\Icons\\Spell_Shadow_RaiseDead",
+                        "Interface\\Icons\\INV_Misc_Head_Dragon_Black",
+                        "Interface\\Icons\\Spell_Fire_Volcano",
+                        "Interface\\Icons\\Ability_Warrior_BattleShout",
+                    }
+                else
+                    -- Retail / MoP: original thematic Achievement icons.
+                    TEST_PORTRAITS = {
+                        "Interface\\Icons\\Achievement_Boss_LichKing",
+                        "Interface\\Icons\\Achievement_Boss_KelThuzad_01",
+                        "Interface\\Icons\\Achievement_Boss_Onyxia",
+                        "Interface\\Icons\\Achievement_Boss_Ragnaros",
+                        "Interface\\Icons\\Achievement_Boss_Illidan",
+                    }
+                end
                 frame.portrait:SetTexture(TEST_PORTRAITS[frame.index] or TEST_PORTRAITS[1])
             else
                 SetPortraitTexture(frame.portrait, unit)
@@ -797,7 +821,11 @@ BossW.RefreshAll = RefreshAll
 -- ============================================================
 local function CreateBossFrame(index)
     local name = "BossWatchFrame" .. index
-    local unit = "boss" .. index
+    -- On SoD an empty slot returns nil — fall back to a harmless placeholder
+    -- so SecureUnitButtonTemplate doesn't choke on a nil unit attribute.
+    -- The SlotProvider will SetAttribute('unit', realUnit) once a mob is
+    -- assigned, via the OnSlotChanged callback wired in EnsureCreated.
+    local unit = BossW.SlotProvider:GetUnit(index) or "none"
 
     local f = CreateFrame("Button", name, BossW.BossContainer, "SecureUnitButtonTemplate")
     f:SetAttribute("unit", unit)
@@ -813,10 +841,15 @@ local function CreateBossFrame(index)
     f.applyClickActions = function()
         if InCombatLockdown() then return false end
         local db = BossW:GetDB()
+        -- Read the unit from the secure attribute rather than the closure: on
+        -- SoD the slot's unit token can change at runtime, so the macro must
+        -- target whatever this frame currently points at, not the value
+        -- captured when the frame was first built.
+        local currentUnit = f:GetAttribute("unit") or unit
         if db.clickActions ~= false then
             f:SetAttribute("shift-type1", "macro")
             f:SetAttribute("shift-macrotext1",
-                ("/run local i=GetRaidTargetIndex('%s') or 0; if i>=8 then i=0 end; SetRaidTarget('%s', i+1)"):format(unit, unit))
+                ("/run local i=GetRaidTargetIndex('%s') or 0; if i>=8 then i=0 end; SetRaidTarget('%s', i+1)"):format(currentUnit, currentUnit))
             f:SetAttribute("ctrl-type1", "focus")
         else
             f:SetAttribute("shift-type1", nil)
@@ -827,7 +860,7 @@ local function CreateBossFrame(index)
     end
     f.applyClickActions()
 
-    RegisterStateDriver(f, "visibility", "[@" .. unit .. ",exists]show;hide")
+    RegisterStateDriver(f, "visibility", BossW.SlotProvider:GetVisibilityDriver(index))
 
     local bg = f:CreateTexture(nil, "BACKGROUND")
     bg:SetAllPoints(f)
@@ -884,13 +917,17 @@ local function CreateBossFrame(index)
     pwText:SetPoint("RIGHT", pw, "RIGHT", -2, 0)
     f.powerText = pwText
 
-    -- Name + health text
-    local nameText = hp:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    -- Name + health text. Parented to the ABSORB bar (frame-level hp+4)
+    -- rather than hp itself, so the text renders ABOVE the shield fill —
+    -- otherwise the name (or hp text) sitting on the right side of the
+    -- bar gets covered when the absorb is large enough. Anchors still
+    -- reference hp positions so the visible layout is unchanged.
+    local nameText = abs:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     nameText:SetPoint("LEFT", hp, "LEFT", 4, 0)
     nameText:SetTextColor(1, 1, 1)
     f.nameText = nameText
 
-    local hpText = hp:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local hpText = abs:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     hpText:SetPoint("RIGHT", hp, "RIGHT", -4, 0)
     hpText:SetTextColor(1, 1, 1)
     f.healthText = hpText
@@ -954,6 +991,11 @@ end
 -- ============================================================
 -- INIT
 -- ============================================================
+-- Queue of slot-attribute changes deferred because we were in combat.
+-- Flushed on PLAYER_REGEN_ENABLED. Only meaningful when the SoD provider
+-- is active — on Retail/MoP the slot ↔ unit mapping never changes.
+local _pendingSlotUnits = {}
+
 function BossW:EnsureCreated()
     if BossW.BossContainer then return end
     local db = BossW:GetDB()
@@ -981,6 +1023,35 @@ function BossW:EnsureCreated()
     for i = 1, MAX_BOSS do BossW.BossFrames[i] = CreateBossFrame(i) end
     ApplyLayout()
     if db.hideBlizzard then BossW:HideBlizzardBossFrames() end
+
+    -- Subscribe once to slot reassignments. On Retail / MoP the trivial
+    -- provider never fires the callback, so this is a no-op there. On SoD
+    -- the SodSlotProvider fires it whenever a slot picks up or drops a
+    -- nameplate token, and the handler re-points the matching BossFrame.
+    if BossW.SlotProvider and BossW.SlotProvider.OnSlotChanged then
+        BossW.SlotProvider:OnSlotChanged(function(slotIndex, oldUnit, newUnit)
+            local f = BossW.BossFrames[slotIndex]
+            if not f then return end
+            f.unit = newUnit
+            -- Re-register the state driver so visibility tracks the new
+            -- token. RegisterStateDriver is NOT restricted in combat —
+            -- safe to call here.
+            RegisterStateDriver(f, "visibility",
+                BossW.SlotProvider:GetVisibilityDriver(slotIndex))
+            -- SetAttribute('unit', ...) IS restricted in combat. Queue and
+            -- flush on PLAYER_REGEN_ENABLED.
+            if InCombatLockdown() then
+                _pendingSlotUnits[slotIndex] = newUnit or false
+            else
+                f:SetAttribute("unit", newUnit or "none")
+                if f.applyClickActions then f.applyClickActions() end
+            end
+            -- Cast bar: the old unit may have been mid-cast. Drop it.
+            if f.castBar and BossW.ClearCast then BossW.ClearCast(f) end
+            -- Auras: force a refresh against the new unit.
+            if newUnit and BossW.UpdateAuras then BossW.UpdateAuras(f) end
+        end)
+    end
 end
 
 -- ============================================================
@@ -1171,7 +1242,12 @@ function BossW:SetTestMode(count)
                 _testNextCast[i] = nil
                 if f.castBar then f.castBar:Hide() end
                 if not InCombatLockdown() then
-                    RegisterStateDriver(f, "visibility", "[@" .. f.unit .. ",exists]show;hide")
+                    -- Route through the provider so on SoD (where f.unit may
+                    -- be nil because no slot is currently assigned) we get
+                    -- the right driver ("hide") instead of a string-concat
+                    -- error on nil.
+                    RegisterStateDriver(f, "visibility",
+                        BossW.SlotProvider:GetVisibilityDriver(f.index))
                 end
             end
         end
@@ -1207,6 +1283,19 @@ eventFrame:SetScript("OnEvent", function(_, event)
             if f then applyTargetHighlight(f) end
         end
         return
+    end
+    if event == "PLAYER_REGEN_ENABLED" then
+        -- Flush any slot unit changes that were blocked by combat lockdown.
+        if next(_pendingSlotUnits) then
+            for slotIndex, newUnit in pairs(_pendingSlotUnits) do
+                local f = BossW.BossFrames[slotIndex]
+                if f then
+                    f:SetAttribute("unit", newUnit or "none")
+                    if f.applyClickActions then f.applyClickActions() end
+                end
+                _pendingSlotUnits[slotIndex] = nil
+            end
+        end
     end
     if event == "PLAYER_REGEN_ENABLED" and _pendingLayout then
         _pendingLayout = false

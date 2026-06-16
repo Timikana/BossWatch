@@ -96,6 +96,17 @@ BossW.Defaults = {
     aurasShowStacks = true, aurasStackAnchor = "BOTTOMRIGHT", aurasStackX = 0, aurasStackY = 0,
     aurasShowTimer = true, aurasTimerPlacement = "BELOW", aurasTimerX = 0, aurasTimerY = 0,
     aurasTooltip = true,
+
+    -- SoD / Classic Era detection (only consumed by Frames/SodSlotProvider.lua,
+    -- which is loaded ONLY by BossWatch-Vanilla.toc — on Retail/MoP these
+    -- keys are seeded into the profile but never read).
+    maxBossSoD             = 5,     -- 3, 5 or 8
+    sodIncludeWorldBosses  = true,  -- UnitClassification == "worldboss"
+    sodIncludeRareElites   = true,  -- UnitClassification == "rareelite"
+    sodIncludeElites       = true,  -- UnitClassification == "elite"
+    sodIncludeRares        = false, -- UnitClassification == "rare" (silver, non-elite)
+    sodReleaseDelay        = 5,     -- seconds out of combat before freeing a slot
+                                    -- whose unit token has gone missing
 }
 
 -- ============================================================
@@ -154,8 +165,9 @@ local function ensureProfilesDB()
     BossWatchDB.profiles = BossWatchDB.profiles or {}
     if not BossWatchDB.profiles.Default then BossWatchDB.profiles.Default = {} end
     BossWatchDB.charBindings = BossWatchDB.charBindings or {}
-    -- Account-wide minimap state (NOT per-profile)
-    BossWatchDB.minimap = BossWatchDB.minimap or { hide = true }
+    -- Account-wide minimap state (NOT per-profile). Default = visible so new
+    -- users discover the addon entry point without needing to read the README.
+    BossWatchDB.minimap = BossWatchDB.minimap or { hide = false }
     -- Account-wide tracker for "NEW" badge dismissal (NOT per-profile —
     -- once a user has seen a feature, the badge stays gone everywhere)
     BossWatchDB.seenFeatures = BossWatchDB.seenFeatures or {}
@@ -506,9 +518,9 @@ function BossW:DumpAuras(unit)
         units = { unit }
     else
         units = {}
-        for i = 1, BossW.MAX_BOSS do
-            local u = "boss" .. i
-            if UnitExists(u) then units[#units + 1] = u end
+        for i = 1, BossW.SlotProvider:GetMaxSlots() do
+            local u = BossW.SlotProvider:GetUnit(i)
+            if u and UnitExists(u) then units[#units + 1] = u end
         end
         if #units == 0 then units = { "target" } end
     end
@@ -578,6 +590,9 @@ init:SetScript("OnEvent", function()
     if BossW.ApplyFonts then BossW:ApplyFonts() end
     if BossW.RegisterMinimapIcon then BossW:RegisterMinimapIcon() end
     if BossW.RegisterBlizzardSettings then BossW:RegisterBlizzardSettings() end
-    print(format(BossW.L["|cffeda55fBossWatch|r v%s loaded — type |cffffff00/bossw|r for options"],
-        C_AddOns and C_AddOns.GetAddOnMetadata(addonName, "Version") or "?"))
+    local v = C_AddOns and C_AddOns.GetAddOnMetadata(addonName, "Version") or "?"
+    print(format("|cffeda55fBossWatch|r v%s " .. (BossW.L["loaded"] or "loaded") ..
+        " — |cffffff00/bossw|r " .. (BossW.L["(options)"] or "(options)") ..
+        ", |cffffff00/bossw test 5|r " .. (BossW.L["(preview)"] or "(preview)") ..
+        ", |cffffff00/bossw mover|r " .. (BossW.L["(move frames)"] or "(move frames)"), v))
 end)

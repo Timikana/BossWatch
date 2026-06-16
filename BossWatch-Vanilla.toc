@@ -1,11 +1,10 @@
-## Interface: 120000, 120001, 120005, 120007
+## Interface: 11507, 11508, 11509
 ## Title: BossWatch
-## Notes: Custom boss target frames for WoW Retail / Midnight 12.0
+## Notes: Custom boss target frames for WoW Classic Era / Season of Discovery
 ## Author: Timikana
 ## Version: 0.8.0
 ## IconTexture: Interface\Icons\Achievement_Boss_Argaloth
 ## SavedVariables: BossWatchDB
-## AllowAddOnTableAccess: 1
 ## X-Curse-Project-ID: 1535856
 ## X-Wago-ID: mKODekGx
 
@@ -28,21 +27,21 @@ Locales\itIT.lua
 Locales\ptBR.lua
 
 # Frames
-# SlotProvider MUST load before Boss/CastBar/Auras (they capture BossW.MAX_BOSS
-# as an upvalue and call BossW.SlotProvider:GetUnit() instead of building
-# "boss"..i themselves). On Vanilla/SoD, BossWatch-Vanilla.toc loads
-# Frames\SodSlotProvider.lua AFTER this to override the trivial provider.
+# Order is critical:
+#   1. SlotProvider.lua sets up the trivial provider (returns "boss"..i).
+#   2. SodSlotProvider.lua OVERRIDES it with a target+nameplate scanner —
+#      THIS is the file that makes the addon work on Classic Era, where
+#      boss1..5 unit IDs don't exist.
+#   3. Boss/CastBar/Auras then capture BossW.MAX_BOSS as upvalue and call
+#      BossW.SlotProvider:* through the indirection.
 Frames\SlotProvider.lua
+Frames\SodSlotProvider.lua
 Frames\MyAuras.lua
 Frames\Boss.lua
 Frames\CastBar.lua
 Frames\Auras.lua
 
 # Options panel
-# Load order matters:
-#   1. Widgets.lua first — defines widget factories on BossW.Options
-#   2. Panel.lua — defines section system + harness; aliases factories from O
-#   3. Pages/*.lua — page builders, register into BossW.Options.Pages
 Options\Widgets.lua
 Options\Panel.lua
 Options\Pages\Layout.lua

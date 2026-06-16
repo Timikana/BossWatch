@@ -349,6 +349,28 @@ local function makeTab(parent, id, label, idx, prevTab)
     tab.id = id
     if PanelTemplates_TabResize then PanelTemplates_TabResize(tab, 0) end
     if TAB_TOOLTIPS[id] then addTooltip(tab, TAB_TOOLTIPS[id]) end
+
+    -- ONLY on clients where PanelTabButtonTemplate atlas regions render
+    -- as bare text (Classic Era / TBC Anniversary) do we add a manual
+    -- dark backdrop + thin border so the tab has a visible button shape.
+    -- Retail / Midnight / MoP get the native Blizzard look untouched.
+    if BossW._sodMode then
+        local bg = tab:CreateTexture(nil, "BACKGROUND", nil, -2)
+        bg:SetPoint("TOPLEFT", 2, -3)
+        bg:SetPoint("BOTTOMRIGHT", -2, 3)
+        bg:SetColorTexture(0.08, 0.08, 0.08, 0.85)
+        tab._fallbackBg = bg
+
+        local edge = tab:CreateTexture(nil, "BACKGROUND", nil, -1)
+        edge:SetPoint("TOPLEFT", 1, -2)
+        edge:SetPoint("BOTTOMRIGHT", -1, 2)
+        edge:SetColorTexture(0.35, 0.28, 0.10, 1)
+        tab._fallbackEdge = edge
+
+        local fs = tab:GetFontString()
+        if fs then fs:SetDrawLayer("OVERLAY") end
+    end
+
     return tab
 end
 
@@ -499,14 +521,25 @@ local function build()
     addTooltip(searchBox, L["Filter the panel: type any keyword from a label or tooltip. Sections without a match are auto-collapsed."])
     addTooltip(searchClear, L["Clear the search."])
 
-    -- Classic build banner — only visible on non-retail clients (MoP Classic etc.).
-    -- The banner sits below the title bar and warns that the UI hasn't been
-    -- fully tested in dungeon/raid encounters yet on this client.
+    -- Classic build banner — only visible on non-retail clients.
+    -- Message differs between MoP/Cata/Wrath/TBC (still uses boss1..5 unit IDs
+    -- natively) and Classic Era / SoD (boss1..5 don't exist — see SoD tab).
     if WOW_PROJECT_ID and WOW_PROJECT_MAINLINE and WOW_PROJECT_ID ~= WOW_PROJECT_MAINLINE then
         local banner = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        banner:SetPoint("TOP", panel, "TOP", 0, -32)
+        -- Anchored LEFT (not centered TOP) so it doesn't run under the
+        -- search box at TOPRIGHT. Width is bounded so long messages wrap
+        -- instead of overflowing into the search column.
+        banner:SetPoint("TOPLEFT", panel, "TOPLEFT", 80, -34)
+        banner:SetWidth(420)
+        banner:SetJustifyH("LEFT")
         banner:SetTextColor(1, 0.82, 0)
-        banner:SetText("|cffffd100" .. L["⚠ Classic build — UI not fully tested in encounters yet, please report bugs."] .. "|r")
+        local msg
+        if BossW._sodMode then
+            msg = L["⚠ Classic Era / SoD build — bosses are detected via target + nameplates (see the Classic / SoD tab). Report bugs!"]
+        else
+            msg = L["⚠ Classic build — UI not fully tested in encounters yet, please report bugs."]
+        end
+        banner:SetText("|cffffd100" .. msg .. "|r")
     end
 
     local pageHolder = CreateFrame("Frame", nil, panel)
@@ -583,6 +616,11 @@ local function build()
     pages.auras    = buildPage("auras",    O.Pages.auras)
     pages.profiles = buildPage("profiles", O.Pages.profiles)
     pages.about    = buildPage("about",    O.Pages.about)
+    -- SoD page is only built (and tab only shown) when the SodSlotProvider
+    -- is loaded — i.e. on any client without native boss1..5 unit IDs.
+    if BossW._sodMode and O.Pages.sod then
+        pages.sod  = buildPage("sod",      O.Pages.sod)
+    end
     -- Changelog is no longer a tab — it's a section at the bottom of About.
 
     -- Hidden "search results" page — not in the tab list. When the search box
@@ -737,6 +775,9 @@ local function build()
         { id = "profiles", label = L["Profiles"] },
         { id = "about",    label = L["About"] },
     }
+    if BossW._sodMode then
+        table.insert(tabs, #tabs, { id = "sod", label = L["Classic / SoD"] })
+    end
     local tabBtns = {}
     local function selectTab(id)
         -- If a search is active, clear it before switching (which restores the

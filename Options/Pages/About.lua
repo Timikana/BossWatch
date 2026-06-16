@@ -14,6 +14,11 @@ local function buildChangelogSection(parent, anchorWidget)
 
     -- Per-version blocks. Each entry: { version, date, lines = { ... } }
     local entries = {
+        { ver = "v0.8.0", date = "2026-05-18", lines = {
+            L["Support Classic Era / Season of Discovery. A third TOC ships in the package and detects elite enemies via target + nameplates (boss1..5 unit IDs don't exist on Vanilla). New 'Classic / SoD' tab in the options for detection filters and capacity. Enable enemy nameplates (Ctrl-V) for the auto-detection to work."],
+            L["Hotfix: taint cascade in EditMode (cf v0.7.9)."],
+            L["Internal: BossW.SlotProvider abstraction between BossFrames and unit tokens. Behaviour identical bit-for-bit on Retail / Midnight / MoP Classic; the abstraction is what lets the SoD client plug in a target+nameplate scanner without duplicating Frames/Boss.lua."],
+        }},
         { ver = "v0.7.8", date = "2026-05-13", lines = {
             L["Absorb overlay is no longer flagged 'experimental' — the feature has been stable for several versions and works on bosses with secret-tagged values."],
             L["Default absorb color changed from translucent cyan to opaque yellow (#FFEB3EFF). Existing profiles keep their color; run /bossw reset or pick the new color manually in Bars > Absorbs to get the new default."],
