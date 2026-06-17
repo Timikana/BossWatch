@@ -10,6 +10,15 @@ versioning per [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.8.3] - 2026-06-17
+
+### Removed
+- **`Frames/MyAuras.lua` (combat-log tracker) removed.** Introduced in v0.8.0 to make the Auras "Only mine" filter reliable on Retail Midnight 12.0+, it turned out to be unusable on that client: Blizzard now rejects `RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")` with `ADDON_ACTION_FORBIDDEN` as soon as any tainted frame is on the caller's stack — which happens constantly when other addons (ElvUI/DBM/Auctionator…) are loaded. Successive workarounds (`C_Timer.After`, exponential backoff, `IsEventRegistered` verification) all failed.
+- Result: the **Auras → Source → "Only mine"** filter reverts to its v0.7.x behaviour. It works perfectly on **Classic / SoD / TBC Anniversary**, and is **partially reliable on Retail Midnight** (Blizzard secret-tags `isFromPlayerOrPlayerPet` on hostile-unit auras — no boss-frame addon has a clean workaround right now).
+
+### Fixed
+- **`ADDON_ACTION_FORBIDDEN` spam still present in v0.8.2** (Klav reported 6+ occurrences on 12.0.7). Cause = `Frames/MyAuras.lua`, removed above. (reported by Klav / warcraftiiitft on 12.0.7). Deferring past `PLAYER_LOGIN` wasn't enough — `BossWatch.lua` has its own `PLAYER_LOGIN` handler that builds SecureUnitButton frames and taints the Lua thread, so `MyAuras.lua`'s `RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")` still landed inside an execution flagged as protected. Robust fix: escape the current thread via `C_Timer.After(0, ...)`, which reschedules the registration onto the next frame tick in a fresh context.
+
 ## [0.8.2] - 2026-06-17
 
 ### Fixed

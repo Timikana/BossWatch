@@ -2,7 +2,7 @@
 ## Title: BossWatch
 ## Notes: Custom boss target frames for WoW MoP Classic
 ## Author: Timikana
-## Version: 0.8.2
+## Version: 0.8.3
 ## IconTexture: Interface\Icons\Achievement_Boss_Argaloth
 ## SavedVariables: BossWatchDB
 ## X-Curse-Project-ID: 1535856
@@ -29,7 +29,6 @@ Locales\ptBR.lua
 # Frames
 # SlotProvider MUST load before Boss/CastBar/Auras.
 Frames\SlotProvider.lua
-Frames\MyAuras.lua
 Frames\Boss.lua
 Frames\CastBar.lua
 Frames\Auras.lua

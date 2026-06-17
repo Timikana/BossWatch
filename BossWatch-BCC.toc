@@ -2,7 +2,7 @@
 ## Title: BossWatch
 ## Notes: Custom boss target frames for WoW TBC Classic / Anniversary
 ## Author: Timikana
-## Version: 0.8.2
+## Version: 0.8.3
 ## IconTexture: Interface\Icons\Achievement_Boss_Argaloth
 ## SavedVariables: BossWatchDB
 ## X-Curse-Project-ID: 1535856
@@ -34,7 +34,6 @@ Locales\ptBR.lua
 # Frames
 Frames\SlotProvider.lua
 Frames\SodSlotProvider.lua
-Frames\MyAuras.lua
 Frames\Boss.lua
 Frames\CastBar.lua
 Frames\Auras.lua
