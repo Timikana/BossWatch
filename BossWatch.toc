@@ -2,7 +2,7 @@
 ## Title: BossWatch
 ## Notes: Custom boss target frames for WoW Retail / Midnight 12.0
 ## Author: Timikana
-## Version: 0.8.3
+## Version: 0.8.4
 ## IconTexture: Interface\Icons\Achievement_Boss_Argaloth
 ## SavedVariables: BossWatchDB
 ## AllowAddOnTableAccess: 1

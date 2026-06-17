@@ -10,6 +10,11 @@ versioning per [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.8.4] - 2026-06-17
+
+### Fixed
+- The limitation marker next to "Only mine" / "Hide mine" in the **Auras → Source** dropdown rendered as an empty box (the WoW dropdown font doesn't carry the Unicode ⚠ glyph). Replaced with orange `(!)`, which reads cleanly on every client.
+
 ## [0.8.3] - 2026-06-17
 
 ### Removed

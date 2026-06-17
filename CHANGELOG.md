@@ -6,6 +6,11 @@ versionnage selon [SemVer](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+## [0.8.4] - 2026-06-17
+
+### Corrigé
+- Le marqueur de limitation à côté de "Uniquement les miennes" / "Cacher les miennes" dans le dropdown **Auras → Source** s'affichait comme un carré vide (la police du dropdown WoW ne rend pas le glyphe Unicode ⚠). Remplacé par `(!)` en orange, qui rend correctement partout.
+
 ## [0.8.3] - 2026-06-17
 
 ### Retiré
