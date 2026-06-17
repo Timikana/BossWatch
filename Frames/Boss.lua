@@ -917,17 +917,25 @@ local function CreateBossFrame(index)
     pwText:SetPoint("RIGHT", pw, "RIGHT", -2, 0)
     f.powerText = pwText
 
-    -- Name + health text. Parented to the ABSORB bar (frame-level hp+4)
-    -- rather than hp itself, so the text renders ABOVE the shield fill —
-    -- otherwise the name (or hp text) sitting on the right side of the
-    -- bar gets covered when the absorb is large enough. Anchors still
-    -- reference hp positions so the visible layout is unchanged.
-    local nameText = abs:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    -- Name + health text live on a dedicated text overlay frame that:
+    --   • is parented to hp (always shown, even when there's no absorb)
+    --   • has a frame level ONE ABOVE the absorb bar, so the text always
+    --     renders above the shield fill regardless of absorb amount
+    -- The previous approach (parenting fontStrings directly to `abs`) made
+    -- the text disappear whenever absorbBar:Hide() ran, since FontStrings
+    -- inherit their parent's visibility. Reported by warcraftiiitft on
+    -- v0.8.1 ("text disappeared" on Frost DK, no absorb on most pulls).
+    local textOverlay = CreateFrame("Frame", nil, hp)
+    textOverlay:SetAllPoints(hp)
+    textOverlay:SetFrameLevel(abs:GetFrameLevel() + 1)
+    f.textOverlay = textOverlay
+
+    local nameText = textOverlay:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     nameText:SetPoint("LEFT", hp, "LEFT", 4, 0)
     nameText:SetTextColor(1, 1, 1)
     f.nameText = nameText
 
-    local hpText = abs:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local hpText = textOverlay:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     hpText:SetPoint("RIGHT", hp, "RIGHT", -4, 0)
     hpText:SetTextColor(1, 1, 1)
     f.healthText = hpText

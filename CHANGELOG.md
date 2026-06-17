@@ -6,6 +6,9 @@ versionnage selon [SemVer](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+### Corrigé
+- **Texte (nom + PV) qui disparaît sur les frames quand le boss n'a pas de bouclier d'absorption** (rapporté par warcraftiiitft, Frost DK 12.0.7). La v0.8.0 reparentait `nameText` et `healthText` à la barre d'absorption pour les rendre au-dessus du shield, mais quand `absorbBar:Hide()` était appelé (boss sans absorb), les FontStrings enfants étaient cachés en cascade. Les textes vivent maintenant sur un `textOverlay` Frame dédié, parenté à la HP bar (toujours visible) et avec un frame level juste au-dessus de la barre d'absorption — donc visible quand le shield est inactif ET au-dessus quand il est actif.
+
 ## [0.8.1] - 2026-06-17
 
 ### Corrigé
