@@ -10,6 +10,11 @@ versioning per [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.8.2] - 2026-06-17
+
+### Fixed
+- **Boss name + HP text disappearing when the boss has no absorb shield** (reported by warcraftiiitft, Frost DK 12.0.7). v0.8.0 reparented `nameText` and `healthText` to the absorb StatusBar so they'd render above the shield, but when `absorbBar:Hide()` ran (most pulls), the child FontStrings inherited the hidden state and vanished. Text now lives on a dedicated `textOverlay` frame parented to the HP bar (always visible) with a frame level one above the absorb bar — visible when there's no shield AND above when there is one.
+
 ## [0.8.1] - 2026-06-17
 
 ### Fixed
