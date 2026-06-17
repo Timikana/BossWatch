@@ -10,6 +10,9 @@ versioning per [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- **`ADDON_ACTION_FORBIDDEN` spam that v0.8.1 did NOT fully fix** (reported by Klav / warcraftiiitft on 12.0.7). Deferring past `PLAYER_LOGIN` wasn't enough — `BossWatch.lua` has its own `PLAYER_LOGIN` handler that builds SecureUnitButton frames and taints the Lua thread, so `MyAuras.lua`'s `RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")` still landed inside an execution flagged as protected. Robust fix: escape the current thread via `C_Timer.After(0, ...)`, which reschedules the registration onto the next frame tick in a fresh context.
+
 ## [0.8.2] - 2026-06-17
 
 ### Fixed

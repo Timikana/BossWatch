@@ -66,19 +66,26 @@ end
 -- of combat log so it must do nothing more than table writes for events
 -- we care about.
 --
--- IMPORTANT: COMBAT_LOG_EVENT_UNFILTERED registered at file-load main chunk
--- triggers ADDON_ACTION_FORBIDDEN on Retail Midnight 12.0+ (Smuglerz bug
--- report, 2026-06-17). The event is treated as protected when subscribed
--- before PLAYER_LOGIN. Defer the actual registration into the PLAYER_LOGIN
--- handler — same pattern WeakAuras / BigWigs use.
+-- IMPORTANT: COMBAT_LOG_EVENT_UNFILTERED triggers ADDON_ACTION_FORBIDDEN
+-- on Retail Midnight 12.0+ when subscribed in any context that shares its
+-- Lua thread with BossWatch.lua's own PLAYER_LOGIN handler (which builds
+-- SecureUnitButton frames and taints the thread). First reported by
+-- Smuglerz (v0.8.0, fixed in v0.8.1 by deferring to PLAYER_LOGIN); still
+-- triggered on Klav / warcraftiiitft (v0.8.1) because the same handler
+-- chain is involved. The robust pattern is to escape the current Lua
+-- thread entirely via C_Timer.After(0, ...) — the callback runs on the
+-- next frame tick in a fresh, untainted execution context.
 local ev = CreateFrame("Frame")
 ev:RegisterEvent("PLAYER_LOGIN")
 
 ev:SetScript("OnEvent", function(self, event)
     if event == "PLAYER_LOGIN" then
-        -- Now safe to subscribe to the combat-log + zone-change events.
-        self:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
-        self:RegisterEvent("PLAYER_ENTERING_WORLD")
+        -- Defer registration onto the next frame tick. RegisterEvent is
+        -- idempotent so it's safe to call once here; we never re-arm it.
+        C_Timer.After(0, function()
+            self:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
+            self:RegisterEvent("PLAYER_ENTERING_WORLD")
+        end)
         return
     end
     if event == "PLAYER_ENTERING_WORLD" then
