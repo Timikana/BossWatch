@@ -66,26 +66,41 @@ end
 -- of combat log so it must do nothing more than table writes for events
 -- we care about.
 --
--- IMPORTANT: COMBAT_LOG_EVENT_UNFILTERED triggers ADDON_ACTION_FORBIDDEN
--- on Retail Midnight 12.0+ when subscribed in any context that shares its
--- Lua thread with BossWatch.lua's own PLAYER_LOGIN handler (which builds
--- SecureUnitButton frames and taints the thread). First reported by
--- Smuglerz (v0.8.0, fixed in v0.8.1 by deferring to PLAYER_LOGIN); still
--- triggered on Klav / warcraftiiitft (v0.8.1) because the same handler
--- chain is involved. The robust pattern is to escape the current Lua
--- thread entirely via C_Timer.After(0, ...) — the callback runs on the
--- next frame tick in a fresh, untainted execution context.
+-- IMPORTANT: on Retail Midnight 12.0+, `RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")`
+-- is rejected whenever ANY tainted Lua frame sits on the caller's stack
+-- — only the caller matters, not the frame being registered on. So any
+-- of BossWatch.lua / ElvUI / Auctionator / DBM running their PLAYER_LOGIN
+-- handler before us taints the stack for the rest of the tick.
+--
+-- The robust pattern (used by several major addons after the same dance
+-- in v0.8.0 → v0.8.1 → v0.8.2) is:
+--   1. C_Timer.After(0, ...)   — re-enter from C-side timer dispatcher
+--                                  on a fresh stack
+--   2. Verify with IsEventRegistered AFTER the call — RegisterEvent
+--                                  fails silently on taint, no pcall catches it
+--   3. Exponential backoff retry until success
+-- so one unlucky tainted tick never permanently disables the tracker.
 local ev = CreateFrame("Frame")
 ev:RegisterEvent("PLAYER_LOGIN")
 
+local BACKOFF = { 0, 0.25, 1, 3, 10, 30 }
+
+local function _tryRegisterCombatLog(self, attempt)
+    self:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
+    if self:IsEventRegistered("COMBAT_LOG_EVENT_UNFILTERED") then
+        -- Success — also wire the zone-change reset event now.
+        self:RegisterEvent("PLAYER_ENTERING_WORLD")
+        return
+    end
+    attempt = attempt + 1
+    local delay = BACKOFF[attempt]
+    if not delay then return end -- give up after the longest backoff
+    C_Timer.After(delay, function() _tryRegisterCombatLog(self, attempt) end)
+end
+
 ev:SetScript("OnEvent", function(self, event)
     if event == "PLAYER_LOGIN" then
-        -- Defer registration onto the next frame tick. RegisterEvent is
-        -- idempotent so it's safe to call once here; we never re-arm it.
-        C_Timer.After(0, function()
-            self:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
-            self:RegisterEvent("PLAYER_ENTERING_WORLD")
-        end)
+        C_Timer.After(0, function() _tryRegisterCombatLog(self, 0) end)
         return
     end
     if event == "PLAYER_ENTERING_WORLD" then

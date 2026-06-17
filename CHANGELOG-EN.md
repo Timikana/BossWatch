@@ -11,6 +11,9 @@ versioning per [SemVer](https://semver.org/).
 ## [Unreleased]
 
 ### Fixed
+- **`ADDON_ACTION_FORBIDDEN` still firing on v0.8.2** (Klav reported 6 occurrences on 12.0.7). On 12.0+ `RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")` is rejected whenever ANY tainted frame sits on the caller's stack — only the caller matters, not the frame being registered on. So `C_Timer.After(0, ...)` alone can still land on a tick where ElvUI / DBM / Auctionator just tainted things. New pattern: call `IsEventRegistered` after each attempt to detect the silent failure, then retry with exponential backoff (0s → 0.25s → 1s → 3s → 10s → 30s) until it sticks. A single unlucky tick self-heals on the next clean one.
+
+### Fixed
 - **`ADDON_ACTION_FORBIDDEN` spam that v0.8.1 did NOT fully fix** (reported by Klav / warcraftiiitft on 12.0.7). Deferring past `PLAYER_LOGIN` wasn't enough — `BossWatch.lua` has its own `PLAYER_LOGIN` handler that builds SecureUnitButton frames and taints the Lua thread, so `MyAuras.lua`'s `RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")` still landed inside an execution flagged as protected. Robust fix: escape the current thread via `C_Timer.After(0, ...)`, which reschedules the registration onto the next frame tick in a fresh context.
 
 ## [0.8.2] - 2026-06-17
