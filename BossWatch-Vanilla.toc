@@ -36,7 +36,6 @@ Locales\ptBR.lua
 #      BossW.SlotProvider:* through the indirection.
 Frames\SlotProvider.lua
 Frames\SodSlotProvider.lua
-Frames\MyAuras.lua
 Frames\Boss.lua
 Frames\CastBar.lua
 Frames\Auras.lua

@@ -55,6 +55,8 @@ L["enable enemy nameplates (Ctrl-V) for SoD elite auto-detection"] =
     "active les nameplates ennemies (Ctrl-V) pour la détection auto des élites SoD"
 L["⚠ Classic Era / SoD build — bosses are detected via target + nameplates (see the Classic / SoD tab). Report bugs!"] =
     "⚠ Build Classic Era / SoD — les boss sont détectés via la cible + nameplates (voir l'onglet Classic / SoD). Reporte les bugs !"
+L["⚠ On Retail Midnight 12.0+, Blizzard restricts access to the aura source on hostile units (secret-tagged fields). 'Only mine' / 'Hide mine' may misclassify some boss debuffs — no boss-frame addon has a clean workaround right now."] =
+    "⚠ Sur Retail Midnight 12.0+, Blizzard restreint l'accès à la source des auras sur les unités hostiles (champs secret-tagged). 'Seulement les miennes' / 'Cacher les miennes' peuvent mal classifier certains debuffs de boss — aucun addon de boss frame ne contourne ça proprement pour l'instant."
 
 -- ============================================================
 -- PROFILES PAGE

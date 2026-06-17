@@ -93,43 +93,23 @@ end
 -- ============================================================
 -- AURA COLLECTION + SOURCE FILTER
 -- ============================================================
--- Source filter. `targetGUID` is the boss's GUID — used as the primary key
--- to consult the combat-log tracker (BossW.MyAuras) which is the only
--- secret-safe way to determine 'mine' on Retail 12.0+ where aura source
--- fields are tainted on hostile units.
-local function auraMatchesSource(data, source, targetGUID)
+local function auraMatchesSource(data, source)
     if source == "ALL" or not source then return true end
 
-    -- ============ MINE / NOT_MINE ============
-    if source == "MINE" or source == "NOT_MINE" then
-        local mine = false
-
-        -- Primary signal: did combat log see this spellId applied to this
-        -- boss by the player / pet? Combat-log data is never secret-tagged.
-        if BossW.MyAuras and targetGUID and data.spellId then
-            mine = BossW.MyAuras:IsMine(targetGUID, data.spellId)
-        end
-
-        -- Fallback: legacy fields. Wrapped in pcall because on Retail 12.0+
-        -- both isFromPlayerOrPlayerPet and sourceUnit are secret-tagged on
-        -- hostile units. On Classic / SoD / TBC where there's no secret-
-        -- tagging this path is the authoritative one.
-        if not mine then
-            local ok, v = pcall(function()
-                if data.isFromPlayerOrPlayerPet ~= nil then
-                    return data.isFromPlayerOrPlayerPet == true
-                end
-                local s = data.sourceUnit
-                return s == "player" or s == "pet" or s == "vehicle"
-            end)
-            if ok then mine = v or false end
-        end
-
-        if source == "MINE" then return mine end
-        return not mine -- NOT_MINE
+    local mine = false
+    do
+        local ok, v = pcall(function()
+            if data.isFromPlayerOrPlayerPet ~= nil then
+                return data.isFromPlayerOrPlayerPet == true
+            end
+            local s = data.sourceUnit
+            return s == "player" or s == "pet" or s == "vehicle"
+        end)
+        if ok then mine = v or false end
     end
 
-    -- ============ BOSS_ONLY ============
+    if source == "MINE" then return mine end
+    if source == "NOT_MINE" then return not mine end
     if source == "BOSS_ONLY" then
         local okBoss, isBoss = pcall(function() return data.isBossAura == true end)
         if okBoss and isBoss then return true end
@@ -139,7 +119,6 @@ local function auraMatchesSource(data, source, targetGUID)
         end)
         return okSrc and v or false
     end
-
     return true
 end
 
@@ -157,11 +136,6 @@ local auraBuffer = {}
 local function collectAuras(unit, filter, source, maxCount)
     wipe(auraBuffer)
 
-    -- Resolve the target GUID once. UnitGUID is NOT secret-tagged in
-    -- 12.0+ so this is safe; it lets auraMatchesSource consult MyAuras
-    -- (the combat-log tracker) for reliable 'mine' detection.
-    local targetGUID = UnitGUID and UnitGUID(unit) or nil
-
     -- Modern path (10.0+): sorted instance IDs + lookup by ID. Same pattern
     -- SimpleBossFrame uses. The sortRule is built into the C call → boss
     -- debuffs naturally float to the top of the list.
@@ -173,7 +147,7 @@ local function collectAuras(unit, filter, source, maxCount)
                 local data = GetAuraDataByAuraInstanceID(unit, instanceID)
                 if data then
                     data._auraInstanceID = instanceID
-                    if auraMatchesSource(data, source, targetGUID) then
+                    if auraMatchesSource(data, source) then
                         auraBuffer[#auraBuffer + 1] = data
                         if #auraBuffer >= maxCount then break end
                     end
@@ -191,7 +165,7 @@ local function collectAuras(unit, filter, source, maxCount)
             if not data then break end
             data._auraIndex = i
             data._auraInstanceID = data.auraInstanceID
-            if auraMatchesSource(data, source, targetGUID) then
+            if auraMatchesSource(data, source) then
                 auraBuffer[#auraBuffer + 1] = data
                 if #auraBuffer >= maxCount then break end
             end
@@ -199,21 +173,18 @@ local function collectAuras(unit, filter, source, maxCount)
     else
         -- UnitAura legacy (oldest Classic clients). Position 12 (isBossDebuff)
         -- since MoP — populating data.isBossAura makes BOSS_ONLY exact.
-        -- spellId isn't returned by UnitAura on the oldest builds so MyAuras
-        -- can't cross-reference here; we fall back to sourceUnit (which is
-        -- never secret on Vanilla / TBC anyway).
         for i = 1, 40 do
             local name, icon, count, _, duration, expiration, caster,
-                  _, _, spellId, _, isBossDebuff = UnitAura(unit, i, filter)
+                  _, _, _, _, isBossDebuff = UnitAura(unit, i, filter)
             if not name then break end
             local data = {
                 name = name, icon = icon, applications = count or 0,
                 duration = duration or 0, expirationTime = expiration or 0,
-                sourceUnit = caster, spellId = spellId,
+                sourceUnit = caster,
                 isBossAura = isBossDebuff or false,
                 _auraIndex = i,
             }
-            if auraMatchesSource(data, source, targetGUID) then
+            if auraMatchesSource(data, source) then
                 auraBuffer[#auraBuffer + 1] = data
                 if #auraBuffer >= maxCount then break end
             end

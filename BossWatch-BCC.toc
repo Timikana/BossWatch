@@ -34,7 +34,6 @@ Locales\ptBR.lua
 # Frames
 Frames\SlotProvider.lua
 Frames\SodSlotProvider.lua
-Frames\MyAuras.lua
 Frames\Boss.lua
 Frames\CastBar.lua
 Frames\Auras.lua

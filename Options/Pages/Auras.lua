@@ -21,12 +21,26 @@ function O.Pages.auras(page)
         { text = L["Buffs (HELPFUL)"],   value = "HELPFUL" },
     }, 184, y), L["Which kind of auras to display: debuffs (HARMFUL) or buffs (HELPFUL)."])
     y = y - 56
+    -- On Retail Midnight 12.0+, Blizzard secret-tags isFromPlayerOrPlayerPet
+    -- and sourceUnit on hostile-unit auras, which makes the MINE / NOT_MINE
+    -- options unreliable. We don't disable the dropdown (the filter still
+    -- works for most cases via pcall fallback), but we suffix the affected
+    -- labels with ⚠ and put the Blizzard limitation in the tooltip.
+    local isRetailMidnight = (_G.WOW_PROJECT_ID == _G.WOW_PROJECT_MAINLINE)
+    local labelMine    = L["Only mine"]
+    local labelNotMine = L["Hide mine"]
+    local sourceTip    = L["Filter by who applied the aura: anyone, only you, hide yours, or only boss-cast."]
+    if isRetailMidnight then
+        labelMine    = labelMine    .. " |cffffaa00⚠|r"
+        labelNotMine = labelNotMine .. " |cffffaa00⚠|r"
+        sourceTip = sourceTip .. "\n\n|cffffaa00" .. L["⚠ On Retail Midnight 12.0+, Blizzard restricts access to the aura source on hostile units (secret-tagged fields). 'Only mine' / 'Hide mine' may misclassify some boss debuffs — no boss-frame addon has a clean workaround right now."] .. "|r"
+    end
     addTooltip(makeDropdown(page, L["Source"], "aurasSource", {
         { text = L["All (Blizzard-like)"], value = "ALL" },
-        { text = L["Only mine"],           value = "MINE" },
-        { text = L["Hide mine"],           value = "NOT_MINE" },
+        { text = labelMine,                value = "MINE" },
+        { text = labelNotMine,             value = "NOT_MINE" },
         { text = L["Boss-cast only"],      value = "BOSS_ONLY" },
-    }, 14, y, 180), L["Filter by who applied the aura: anyone, only you, hide yours, or only boss-cast."])
+    }, 14, y, 180), sourceTip)
 
     -- ============ SIZE ============
     y = y - 60

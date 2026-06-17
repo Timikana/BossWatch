@@ -6,11 +6,12 @@ versionnage selon [SemVer](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
-### Corrigé
-- **Spam `ADDON_ACTION_FORBIDDEN` toujours présent en v0.8.2** (Klav signale 6 occurrences sur 12.0.7). En 12.0+, `RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")` est rejeté si **n'importe quelle** frame tainted est sur la stack du caller — peu importe la frame sur laquelle on enregistre. Donc `C_Timer.After(0, ...)` peut quand même tomber sur un tick où ElvUI / DBM / Auctionator viennent juste de taint la stack. Nouveau pattern : `IsEventRegistered` post-call pour détecter l'échec silencieux + retry avec backoff exponentiel (0s → 0.25s → 1s → 3s → 10s → 30s) jusqu'au succès. Un tick malchanceux se répare au tick suivant, le tracker finit toujours par s'armer.
+### Retiré
+- **Module `Frames/MyAuras.lua` (tracking combat-log) supprimé.** Introduit en v0.8.0 pour rendre le filtre Auras "Only mine" fiable sur Retail Midnight 12.0+, il s'est avéré inutilisable sur ce client : `RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")` est désormais rejeté par Blizzard (`ADDON_ACTION_FORBIDDEN`) dès qu'une frame tainted est sur la stack du caller, ce qui arrive en permanence dès qu'un autre addon (ElvUI/DBM/Auctionator…) est actif. Les workarounds successifs (`C_Timer.After`, backoff exponentiel, vérif `IsEventRegistered`) ont tous échoué.
+- Conséquence : le filtre **Auras → Source → "Only mine"** revient à son comportement v0.7.x — il fonctionne parfaitement sur **Classic / SoD / TBC Anniversary**, et il est **partiellement fiable sur Retail Midnight** (limitation Blizzard sur `isFromPlayerOrPlayerPet` secret-tagged sur unités hostiles, aucun addon de boss frame ne contourne ça actuellement).
 
 ### Corrigé
-- **Spam `ADDON_ACTION_FORBIDDEN` qui n'avait PAS été corrigé par la v0.8.1** (rapporté par Klav / warcraftiiitft 12.0.7). Le différer après `PLAYER_LOGIN` ne suffit pas — `BossWatch.lua` a aussi son propre handler `PLAYER_LOGIN` qui crée des SecureUnitButton et taint la thread Lua, donc le `RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")` de `MyAuras.lua` se retrouve quand même dans une exécution marquée protected. Fix robuste : échapper à la thread courante via `C_Timer.After(0, ...)` qui re-schedule l'enregistrement sur le prochain tick dans un contexte propre.
+- **Spam `ADDON_ACTION_FORBIDDEN` toujours présent en v0.8.2** (Klav signale 6+ occurrences sur 12.0.7). Cause = `Frames/MyAuras.lua`, retiré ci-dessus. (rapporté par Klav / warcraftiiitft 12.0.7). Le différer après `PLAYER_LOGIN` ne suffit pas — `BossWatch.lua` a aussi son propre handler `PLAYER_LOGIN` qui crée des SecureUnitButton et taint la thread Lua, donc le `RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")` de `MyAuras.lua` se retrouve quand même dans une exécution marquée protected. Fix robuste : échapper à la thread courante via `C_Timer.After(0, ...)` qui re-schedule l'enregistrement sur le prochain tick dans un contexte propre.
 
 ## [0.8.2] - 2026-06-17
 
