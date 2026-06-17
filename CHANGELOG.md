@@ -6,6 +6,8 @@ versionnage selon [SemVer](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+## [0.8.3] - 2026-06-17
+
 ### Retiré
 - **Module `Frames/MyAuras.lua` (tracking combat-log) supprimé.** Introduit en v0.8.0 pour rendre le filtre Auras "Only mine" fiable sur Retail Midnight 12.0+, il s'est avéré inutilisable sur ce client : `RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")` est désormais rejeté par Blizzard (`ADDON_ACTION_FORBIDDEN`) dès qu'une frame tainted est sur la stack du caller, ce qui arrive en permanence dès qu'un autre addon (ElvUI/DBM/Auctionator…) est actif. Les workarounds successifs (`C_Timer.After`, backoff exponentiel, vérif `IsEventRegistered`) ont tous échoué.
 - Conséquence : le filtre **Auras → Source → "Only mine"** revient à son comportement v0.7.x — il fonctionne parfaitement sur **Classic / SoD / TBC Anniversary**, et il est **partiellement fiable sur Retail Midnight** (limitation Blizzard sur `isFromPlayerOrPlayerPet` secret-tagged sur unités hostiles, aucun addon de boss frame ne contourne ça actuellement).
