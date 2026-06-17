@@ -31,8 +31,9 @@ function O.Pages.auras(page)
     local labelNotMine = L["Hide mine"]
     local sourceTip    = L["Filter by who applied the aura: anyone, only you, hide yours, or only boss-cast."]
     if isRetailMidnight then
-        labelMine    = labelMine    .. " |cffffaa00⚠|r"
-        labelNotMine = labelNotMine .. " |cffffaa00⚠|r"
+        -- ⚠ doesn't render in the WoW dropdown font, use (!) instead.
+        labelMine    = labelMine    .. " |cffffaa00(!)|r"
+        labelNotMine = labelNotMine .. " |cffffaa00(!)|r"
         sourceTip = sourceTip .. "\n\n|cffffaa00" .. L["⚠ On Retail Midnight 12.0+, Blizzard restricts access to the aura source on hostile units (secret-tagged fields). 'Only mine' / 'Hide mine' may misclassify some boss debuffs — no boss-frame addon has a clean workaround right now."] .. "|r"
     end
     addTooltip(makeDropdown(page, L["Source"], "aurasSource", {
