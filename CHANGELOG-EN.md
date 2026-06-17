@@ -10,6 +10,8 @@ versioning per [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-06-17
+
 ### Fixed
 - **`ADDON_ACTION_FORBIDDEN` error spam on Retail Midnight 12.0+** (reported by Smuglerz). Registering `COMBAT_LOG_EVENT_UNFILTERED` at file-load main chunk in the new `Frames/MyAuras.lua` module (v0.8.0) hit Blizzard's protected-function trap, producing 20+ errors at login. Registration is now deferred until after `PLAYER_LOGIN`, the same pattern WeakAuras / BigWigs use. The "Only mine" filter still works identically — just after the login tick.
 
