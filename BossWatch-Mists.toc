@@ -1,4 +1,4 @@
-## Interface: 50500
+## Interface: 50504
 ## Title: BossWatch
 ## Notes: Custom boss target frames for WoW MoP Classic
 ## Author: Timikana

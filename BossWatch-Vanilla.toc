@@ -1,4 +1,4 @@
-## Interface: 11507, 11508, 11509
+## Interface: 11507
 ## Title: BossWatch
 ## Notes: Custom boss target frames for WoW Classic Era / Season of Discovery
 ## Author: Timikana
