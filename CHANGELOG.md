@@ -6,6 +6,9 @@ versionnage selon [SemVer](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+### Corrigé
+- **Filtre Auras "Only mine" laissait passer les debuffs des autres joueurs sur MoP Classic 5.5** (rapporté par necktoo et d'autres). Sur ce client, `C_UnitAuras.GetAuraDataByIndex` populate le champ `isFromPlayerOrPlayerPet` de manière non-fiable, ce qui court-circuitait le fallback `sourceUnit`. Nouveau code path spécifique MoP : lire `sourceUnit` d'abord (fiable sur MoP), et n'utiliser le flag qu'en dernier recours. Retail / Classic Era / SoD / TBC Anniversary gardent la logique originale bit-à-bit.
+
 ## [0.8.5] - 2026-07-06
 
 ### Ajouté

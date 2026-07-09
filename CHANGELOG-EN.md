@@ -10,6 +10,9 @@ versioning per [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- **Auras "Only mine" filter letting other players' debuffs through on MoP Classic 5.5** (reported by necktoo and others). On that client `C_UnitAuras.GetAuraDataByIndex` populates `isFromPlayerOrPlayerPet` but the value is unreliable, which short-circuited the `sourceUnit` fallback. Added an MoP-specific code path that reads `sourceUnit` first (reliable there) and only falls back to the flag if that's nil. Retail / Classic Era / SoD / TBC Anniversary keep the original logic bit-for-bit.
+
 ## [0.8.5] - 2026-07-06
 
 ### Added
