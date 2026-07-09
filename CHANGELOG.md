@@ -6,6 +6,11 @@ versionnage selon [SemVer](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+## [0.8.5] - 2026-07-06
+
+### Ajouté
+- **Option "Cacher sur les combats à un seul boss"** (`hideOnSingleBoss`, dans Disposition → Général, défaut OFF). Quand activée, les BossFrames restent cachées tant qu'un seul boss est engagé — le target frame natif de Blizzard suffit dans ce cas. Elles apparaissent uniquement sur les encounters multi-boss (Council-style, Twin Val'kyr, etc.). Suggestion d'ethereal84 sur CurseForge.
+
 ## [0.8.4] - 2026-06-17
 
 ### Corrigé
