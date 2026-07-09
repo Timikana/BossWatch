@@ -33,7 +33,18 @@ local provider = {
     -- State-driver expression evaluated by the secure macro engine. Used to
     -- toggle the frame's visibility automatically when the underlying unit
     -- appears/disappears, without needing combat-unsafe Lua Show/Hide.
+    --
+    -- If db.hideOnSingleBoss is true, frame 1 additionally requires @boss2 to
+    -- exist — so BossWatch only shows on multi-boss encounters. Frames 2..N
+    -- already only appear when their own bossN exists, which by definition
+    -- means at least N ≥ 2 bosses are engaged, so they don't need the extra
+    -- clause. This matches the request from ethereal84 (CurseForge, 2026-07)
+    -- for a "hide on single-boss encounters" mode.
     GetVisibilityDriver = function(self, i)
+        local db = BossW.GetDB and BossW:GetDB() or nil
+        if db and db.hideOnSingleBoss and i == 1 then
+            return "[@boss1,exists,@boss2,exists]show;hide"
+        end
         return "[@boss" .. i .. ",exists]show;hide"
     end,
 

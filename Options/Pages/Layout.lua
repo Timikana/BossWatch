@@ -96,6 +96,10 @@ function O.Pages.layout(page)
     addTooltip(markAsNew(makeCheck(page, L["Click actions on boss frames"], "clickActions", 14, y), "clickActions"),
         L["Enable modifier+click shortcuts on boss frames: Shift+Click cycles a raid marker, Ctrl+Click sets focus."])
 
+    y = y - 30
+    addTooltip(markAsNew(makeCheck(page, L["Hide on single-boss encounters"], "hideOnSingleBoss", 14, y), "hideOnSingleBoss"),
+        L["When ON, BossWatch stays hidden on 1-boss fights (Blizzard's own target frame is enough there) and only appears when 2+ bosses are engaged (Council-style encounters)."])
+
     -- ============ LAYOUT STYLE ============
     y = y - 60
     makeSection(page, L["Layout style"], 14, y, "layout.style"); y = y - 24

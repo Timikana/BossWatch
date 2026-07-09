@@ -13,6 +13,11 @@ BossW.BossContainer = nil
 BossW.Defaults = {
     enabled = true,
     hideBlizzard = true,
+    -- Only show the boss frames on multi-boss encounters. When true, frame 1
+    -- additionally requires @boss2 to exist — so single-boss encounters
+    -- (which is 90% of raid fights) rely on Blizzard's native target frame
+    -- and BossWatch stays out of the way. Requested by ethereal84 (CF PM).
+    hideOnSingleBoss = false,
 
     -- Container
     anchor = "RIGHT", anchorX = -50, anchorY = 100,

@@ -811,6 +811,13 @@ local function RefreshAll()
         if f then
             UpdateFrame(f)
             if f.applyClickActions then f.applyClickActions() end
+            -- Re-apply visibility driver so toggling hideOnSingleBoss (or the
+            -- SoD slot assignment) reflects immediately without /reload.
+            -- RegisterStateDriver isn't restricted in combat, safe to call.
+            if BossW.SlotProvider and BossW.SlotProvider.GetVisibilityDriver then
+                RegisterStateDriver(f, "visibility",
+                    BossW.SlotProvider:GetVisibilityDriver(i))
+            end
         end
     end
 end
