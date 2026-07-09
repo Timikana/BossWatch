@@ -10,6 +10,8 @@ versioning per [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.8.5] - 2026-07-06
+
 ### Added
 - **"Hide on single-boss encounters" option** (`hideOnSingleBoss`, in Layout → General, default OFF). When enabled, the BossFrames stay hidden as long as only one boss is engaged — Blizzard's native target frame is enough there. They only appear on multi-boss encounters (Council-style, Twin Val'kyr, etc.). Suggested by ethereal84 on CurseForge.
 
