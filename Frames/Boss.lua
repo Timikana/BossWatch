@@ -813,10 +813,22 @@ local function RefreshAll()
             if f.applyClickActions then f.applyClickActions() end
             -- Re-apply visibility driver so toggling hideOnSingleBoss (or the
             -- SoD slot assignment) reflects immediately without /reload.
-            -- RegisterStateDriver isn't restricted in combat, safe to call.
+            --
+            -- ⚠ RegisterStateDriver writes a secure attribute on the
+            -- SecureStateDriverManager frame — that IS blocked in combat
+            -- (ADDON_ACTION_BLOCKED reported on MoP Classic, v0.8.5). Only
+            -- touch it out of combat, only when the driver actually changed,
+            -- and queue a re-run for PLAYER_REGEN_ENABLED otherwise.
             if BossW.SlotProvider and BossW.SlotProvider.GetVisibilityDriver then
-                RegisterStateDriver(f, "visibility",
-                    BossW.SlotProvider:GetVisibilityDriver(i))
+                local driver = BossW.SlotProvider:GetVisibilityDriver(i)
+                if f._visDriver ~= driver then
+                    if InCombatLockdown() then
+                        _pendingLayout = true
+                    else
+                        RegisterStateDriver(f, "visibility", driver)
+                        f._visDriver = driver
+                    end
+                end
             end
         end
     end
@@ -867,7 +879,8 @@ local function CreateBossFrame(index)
     end
     f.applyClickActions()
 
-    RegisterStateDriver(f, "visibility", BossW.SlotProvider:GetVisibilityDriver(index))
+    f._visDriver = BossW.SlotProvider:GetVisibilityDriver(index)
+    RegisterStateDriver(f, "visibility", f._visDriver)
 
     local bg = f:CreateTexture(nil, "BACKGROUND")
     bg:SetAllPoints(f)
@@ -1048,16 +1061,16 @@ function BossW:EnsureCreated()
             local f = BossW.BossFrames[slotIndex]
             if not f then return end
             f.unit = newUnit
-            -- Re-register the state driver so visibility tracks the new
-            -- token. RegisterStateDriver is NOT restricted in combat —
-            -- safe to call here.
-            RegisterStateDriver(f, "visibility",
-                BossW.SlotProvider:GetVisibilityDriver(slotIndex))
-            -- SetAttribute('unit', ...) IS restricted in combat. Queue and
-            -- flush on PLAYER_REGEN_ENABLED.
+            -- ⚠ BOTH RegisterStateDriver (secure attribute write on the
+            -- SecureStateDriverManager) AND SetAttribute('unit', ...) are
+            -- blocked in combat. Queue the whole re-point and flush it on
+            -- PLAYER_REGEN_ENABLED. Out of combat, apply immediately.
             if InCombatLockdown() then
                 _pendingSlotUnits[slotIndex] = newUnit or false
             else
+                local driver = BossW.SlotProvider:GetVisibilityDriver(slotIndex)
+                RegisterStateDriver(f, "visibility", driver)
+                f._visDriver = driver
                 f:SetAttribute("unit", newUnit or "none")
                 if f.applyClickActions then f.applyClickActions() end
             end
@@ -1301,10 +1314,15 @@ eventFrame:SetScript("OnEvent", function(_, event)
     end
     if event == "PLAYER_REGEN_ENABLED" then
         -- Flush any slot unit changes that were blocked by combat lockdown.
+        -- Re-register the visibility driver here too — it was skipped in
+        -- OnSlotChanged for the same secure-write-in-combat reason.
         if next(_pendingSlotUnits) then
             for slotIndex, newUnit in pairs(_pendingSlotUnits) do
                 local f = BossW.BossFrames[slotIndex]
                 if f then
+                    local driver = BossW.SlotProvider:GetVisibilityDriver(slotIndex)
+                    RegisterStateDriver(f, "visibility", driver)
+                    f._visDriver = driver
                     f:SetAttribute("unit", newUnit or "none")
                     if f.applyClickActions then f.applyClickActions() end
                 end
