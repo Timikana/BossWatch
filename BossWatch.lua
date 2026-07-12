@@ -434,15 +434,30 @@ local function _hideSecure(f)
     if f.SetPoint then f:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", -10000, -10000) end
 end
 
-function BossW:HideBlizzardBossFrames()
-    if blizzardHidden then return end
-    blizzardHidden = true
-    _hideSecure(_G["BossTargetFrameContainer"] or _G["BossFrameContainer"])
+local function _eachBlizzardBossFrame(fn)
+    fn(_G["BossTargetFrameContainer"] or _G["BossFrameContainer"])
     for i = 1, BossW.MAX_BOSS do
         for _, n in ipairs({ "Boss" .. i .. "TargetFrame", "BossTargetFrame" .. i }) do
-            _hideSecure(_G[n])
+            fn(_G[n])
         end
     end
+end
+
+function BossW:HideBlizzardBossFrames()
+    if blizzardHidden then return end
+    if InCombatLockdown() then
+        -- Reload-in-combat: ClearAllPoints/SetPoint on Blizzard's protected
+        -- boss frames are blocked. SetAlpha is NOT — apply that now so the
+        -- frames at least vanish visually, flag the full hide as pending,
+        -- and DON'T latch blizzardHidden (the PLAYER_REGEN_ENABLED handler
+        -- in Frames/Boss.lua re-invokes us on a clean stack).
+        BossW._blizzHidePending = true
+        _eachBlizzardBossFrame(function(f) if f then f:SetAlpha(0) end end)
+        return
+    end
+    blizzardHidden = true
+    BossW._blizzHidePending = nil
+    _eachBlizzardBossFrame(_hideSecure)
 end
 
 -- ============================================================

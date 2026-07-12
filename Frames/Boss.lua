@@ -382,7 +382,7 @@ local function applyTargetHighlight(frame)
     local isTarget = false
     if frame._fakeTarget then
         isTarget = true
-    else
+    elseif frame.unit then -- nil while a SoD slot is stale/unassigned
         local v = UnitIsUnit("target", frame.unit)
         if v ~= nil and not issecretvalue(v) then isTarget = v == true end
     end
@@ -402,7 +402,10 @@ end
 BossW._applyTargetHighlight = applyTargetHighlight
 
 local function UpdateFrame(frame)
-    local unit = frame.unit
+    -- frame.unit is nil while a SoD slot is stale/unassigned — fall back to
+    -- the inert "none" token so UnitName/UnitHealth/etc. safely return nil
+    -- instead of erroring on a nil unit argument.
+    local unit = frame.unit or "none"
     local db = BossW:GetDB()
 
     -- Visibility driven by RegisterStateDriver — don't Show/Hide here.
@@ -879,8 +882,24 @@ local function CreateBossFrame(index)
     end
     f.applyClickActions()
 
-    f._visDriver = BossW.SlotProvider:GetVisibilityDriver(index)
-    RegisterStateDriver(f, "visibility", f._visDriver)
+    -- Reload-in-combat path: PLAYER_LOGIN fires with InCombatLockdown()
+    -- true, and RegisterStateDriver (secure write on the
+    -- SecureStateDriverManager) would be blocked. Leave f._visDriver nil
+    -- in that case — the PLAYER_REGEN_ENABLED → RefreshAll repair pass
+    -- detects nil ~= driver and registers it on a clean stack. Caching
+    -- BEFORE a blocked call would poison the repair check and leave the
+    -- frame driverless (thus stuck shown) for the whole session.
+    if InCombatLockdown() then
+        -- A driverless fresh Button defaults to shown — hide it until the
+        -- REGEN repair pass. A just-created frame isn't protected yet
+        -- (same reason the SetAttribute calls above succeed on this path),
+        -- so Hide() is safe here.
+        f:Hide()
+        _pendingLayout = true
+    else
+        f._visDriver = BossW.SlotProvider:GetVisibilityDriver(index)
+        RegisterStateDriver(f, "visibility", f._visDriver)
+    end
 
     local bg = f:CreateTexture(nil, "BACKGROUND")
     bg:SetAllPoints(f)
@@ -1135,8 +1154,26 @@ local function ensureDragOverlay()
     label:SetPoint("CENTER", o, "CENTER", 0, 0)
     label:SetText("BossWatch — left-drag to move, right-click to lock")
     label:SetTextColor(1, 1, 1)
-    o:SetScript("OnDragStart", function() c:StartMoving() end)
+    -- The container carries the SecureUnitButton boss frames (parent/anchor
+    -- chain), so it is protected-by-association: StartMoving / SetPoint on
+    -- it are blocked in combat. Refuse to start a drag in combat; if combat
+    -- began mid-drag, skip the secure writes and let the REGEN pass restore
+    -- the saved position via ApplyLayout.
+    o:SetScript("OnDragStart", function()
+        if InCombatLockdown() then
+            print("|cffeda55fBossWatch:|r " .. (BossW.L["cannot move frames in combat"] or "cannot move frames in combat"))
+            return
+        end
+        o._dragging = true
+        c:StartMoving()
+    end)
     o:SetScript("OnDragStop", function()
+        if not o._dragging then return end
+        o._dragging = nil
+        if InCombatLockdown() then
+            _pendingLayout = true -- REGEN → RefreshAll → ApplyLayout re-anchors from db
+            return
+        end
         c:StopMovingOrSizing()
         local db = BossW:GetDB()
         local point, _, _, x, y = c:GetPoint()
@@ -1303,6 +1340,7 @@ eventFrame:RegisterEvent("INSTANCE_ENCOUNTER_ENGAGE_UNIT")
 eventFrame:RegisterEvent("ENCOUNTER_START")
 eventFrame:RegisterEvent("ENCOUNTER_END")
 eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
+eventFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
 eventFrame:RegisterEvent("PLAYER_TARGET_CHANGED")
 eventFrame:SetScript("OnEvent", function(_, event)
     if event == "PLAYER_TARGET_CHANGED" then
@@ -1312,7 +1350,28 @@ eventFrame:SetScript("OnEvent", function(_, event)
         end
         return
     end
+    if event == "PLAYER_REGEN_DISABLED" then
+        -- Combat starts: retract the mover overlay so no drag can begin
+        -- while the container is combat-locked. _movingEnabled is kept so
+        -- the REGEN handler below can restore the overlay.
+        local c = BossW.BossContainer
+        if c and c._dragOverlay and c._dragOverlay:IsShown() then
+            c._dragOverlay:Hide()
+            c._moverSuspended = true
+        end
+        return
+    end
     if event == "PLAYER_REGEN_ENABLED" then
+        -- Combat ended: finish the Blizzard-frame hide if it was deferred
+        -- by a reload-in-combat, and restore a suspended mover overlay.
+        if BossW._blizzHidePending and BossW.HideBlizzardBossFrames then
+            BossW:HideBlizzardBossFrames()
+        end
+        local c = BossW.BossContainer
+        if c and c._moverSuspended then
+            c._moverSuspended = nil
+            if c._movingEnabled and c._dragOverlay then c._dragOverlay:Show() end
+        end
         -- Flush any slot unit changes that were blocked by combat lockdown.
         -- Re-register the visibility driver here too — it was skipped in
         -- OnSlotChanged for the same secure-write-in-combat reason.

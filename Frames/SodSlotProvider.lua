@@ -140,8 +140,21 @@ local function _assign(unit)
 end
 
 local function _markStale(unit)
-    for _, s in pairs(slots) do
-        if s.unit == unit then s.lastSeen = GetTime() - 0.001; s.unit = nil end
+    for i, s in pairs(slots) do
+        if s.unit == unit then
+            local old = s.unit
+            s.lastSeen = GetTime() - 0.001
+            s.unit = nil
+            -- Notify consumers: without this, the boss frame keeps its
+            -- [@nameplateN,exists] driver + unit attribute pointing at a
+            -- RECYCLABLE token — when the Classic client reassigns
+            -- nameplateN to a different mob mid-fight, the frame would
+            -- show/track the wrong unit. Firing with newUnit=nil routes
+            -- through Boss.lua's OnSlotChanged: immediate re-point out of
+            -- combat, queued into _pendingSlotUnits for the REGEN flush
+            -- in combat. The GUID is kept so _assign can re-acquire.
+            provider:_fireSlotChanged(i, old, nil)
+        end
     end
 end
 
