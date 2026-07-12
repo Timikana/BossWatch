@@ -6,10 +6,10 @@ versionnage selon [SemVer](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
-### Corrigé
-- **Erreur `ADDON_ACTION_BLOCKED` (`SecureStateDriverManager:SetAttribute`) en combat sur MoP Classic** (rapportée après la v0.8.5). La feature "Cacher sur les combats à un seul boss" ré-enregistrait le state driver de visibilité dans `RefreshAll` en affirmant que `RegisterStateDriver` était autorisé en combat — c'est faux : il écrit un attribut secure sur le `SecureStateDriverManager`, bloqué en combat. Le ré-enregistrement est maintenant gated `InCombatLockdown()` + mis en file pour `PLAYER_REGEN_ENABLED`, et n'écrit que si le driver a réellement changé (cache par frame). Même correctif appliqué au handler de réassignation de slot SoD, qui avait le même bug latent.
+## [0.8.6] - 2026-07-12
 
 ### Corrigé
+- **Erreur `ADDON_ACTION_BLOCKED` (`SecureStateDriverManager:SetAttribute`) en combat sur MoP Classic** (rapportée après la v0.8.5). La feature "Cacher sur les combats à un seul boss" ré-enregistrait le state driver de visibilité dans `RefreshAll` en affirmant que `RegisterStateDriver` était autorisé en combat — c'est faux : il écrit un attribut secure sur le `SecureStateDriverManager`, bloqué en combat. Le ré-enregistrement est maintenant gated `InCombatLockdown()` + mis en file pour `PLAYER_REGEN_ENABLED`, et n'écrit que si le driver a réellement changé (cache par frame). Même correctif appliqué au handler de réassignation de slot SoD, qui avait le même bug latent.
 - **Filtre Auras "Only mine" laissait passer les debuffs des autres joueurs sur MoP Classic 5.5** (rapporté par necktoo et d'autres). Sur ce client, `C_UnitAuras.GetAuraDataByIndex` populate le champ `isFromPlayerOrPlayerPet` de manière non-fiable, ce qui court-circuitait le fallback `sourceUnit`. Nouveau code path spécifique MoP : lire `sourceUnit` d'abord (fiable sur MoP), et n'utiliser le flag qu'en dernier recours. Retail / Classic Era / SoD / TBC Anniversary gardent la logique originale bit-à-bit.
 
 ## [0.8.5] - 2026-07-06
