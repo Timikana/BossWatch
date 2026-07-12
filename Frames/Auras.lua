@@ -93,12 +93,33 @@ end
 -- ============================================================
 -- AURA COLLECTION + SOURCE FILTER
 -- ============================================================
+-- MoP Classic 5.5 quirk: C_UnitAuras.GetAuraDataByIndex populates
+-- `isFromPlayerOrPlayerPet` but the value is unreliable (users report the
+-- "Only mine" filter letting other players' debuffs through). `sourceUnit`
+-- IS accurate on MoP — so we skip the flag shortcut and go straight to
+-- sourceUnit. Retail / Classic Era / TBC / SoD keep the original ordering
+-- so nothing else changes.
+local IS_MOP_CLASSIC = _G.WOW_PROJECT_ID and _G.WOW_PROJECT_MISTS_CLASSIC
+    and (_G.WOW_PROJECT_ID == _G.WOW_PROJECT_MISTS_CLASSIC)
+
 local function auraMatchesSource(data, source)
     if source == "ALL" or not source then return true end
 
     local mine = false
     do
         local ok, v = pcall(function()
+            if IS_MOP_CLASSIC then
+                -- sourceUnit-first path (MoP only).
+                local s = data.sourceUnit
+                if s ~= nil then
+                    return s == "player" or s == "pet" or s == "vehicle"
+                end
+                if data.isFromPlayerOrPlayerPet ~= nil then
+                    return data.isFromPlayerOrPlayerPet == true
+                end
+                return false
+            end
+            -- Original v0.7.x order for every other client.
             if data.isFromPlayerOrPlayerPet ~= nil then
                 return data.isFromPlayerOrPlayerPet == true
             end
