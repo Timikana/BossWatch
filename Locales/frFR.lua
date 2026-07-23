@@ -57,6 +57,7 @@ L["⚠ Classic Era / SoD build — bosses are detected via target + nameplates (
     "⚠ Build Classic Era / SoD — les boss sont détectés via la cible + nameplates (voir l'onglet Classic / SoD). Reporte les bugs !"
 L["⚠ On Retail Midnight 12.0+, Blizzard restricts access to the aura source on hostile units (secret-tagged fields). 'Only mine' / 'Hide mine' may misclassify some boss debuffs — no boss-frame addon has a clean workaround right now."] =
     "⚠ Sur Retail Midnight 12.0+, Blizzard restreint l'accès à la source des auras sur les unités hostiles (champs secret-tagged). 'Seulement les miennes' / 'Cacher les miennes' peuvent mal classifier certains debuffs de boss — aucun addon de boss frame ne contourne ça proprement pour l'instant."
+L["cannot move frames in combat"] = "impossible de déplacer les frames en combat"
 L["Hide on single-boss encounters"] = "Cacher sur les combats à un seul boss"
 L["When ON, BossWatch stays hidden on 1-boss fights (Blizzard's own target frame is enough there) and only appears when 2+ bosses are engaged (Council-style encounters)."] =
     "Quand ON, BossWatch reste caché sur les combats à 1 boss (le target frame Blizzard suffit) et n'apparaît que quand 2+ boss sont engagés (encounters style Council)."

@@ -10,6 +10,15 @@ versioning per [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.8.7] - 2026-07-12
+
+### Fixed
+- **Full combat-lockdown audit following the v0.8.5 bug — 4 risky paths fixed.** Common trigger: `/reload` **during** combat (`PLAYER_LOGIN` then fires with `InCombatLockdown()` active):
+  - Frame creation registered the visibility state driver ungated — blocked, and the poisoned cache prevented any post-combat repair (frames stuck visible with empty data until the next out-of-combat reload). The driver registration is now deferred to combat end and the frames stay hidden meanwhile.
+  - `HideBlizzardBossFrames` repositioned Blizzard's protected boss frames in combat, and its internal latch prevented any retry — the Blizzard frames stayed anchored on screen for the whole session. Now: immediate alpha 0 (allowed), full repositioning deferred to combat end.
+  - The **mover** (green drag handle) could start a drag in combat → `ADDON_ACTION_BLOCKED`. Drags are now refused in combat (chat message), and the overlay auto-retracts when combat starts and returns when it ends.
+  - **SoD**: a nameplate despawning mid-combat left the frame pointing at a recyclable token — if the client reassigned `nameplateN` to a different mob, the frame displayed/targeted the wrong enemy until combat ended. The slot now notifies consumers immediately (cleanup deferred to combat end, nil guards added).
+
 ## [0.8.6] - 2026-07-12
 
 ### Fixed
