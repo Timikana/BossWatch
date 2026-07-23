@@ -10,6 +10,8 @@ versioning per [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.8.7] - 2026-07-12
+
 ### Fixed
 - **Full combat-lockdown audit following the v0.8.5 bug — 4 risky paths fixed.** Common trigger: `/reload` **during** combat (`PLAYER_LOGIN` then fires with `InCombatLockdown()` active):
   - Frame creation registered the visibility state driver ungated — blocked, and the poisoned cache prevented any post-combat repair (frames stuck visible with empty data until the next out-of-combat reload). The driver registration is now deferred to combat end and the frames stay hidden meanwhile.

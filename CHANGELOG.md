@@ -6,6 +6,8 @@ versionnage selon [SemVer](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+## [0.8.7] - 2026-07-12
+
 ### Corrigé
 - **Audit combat-lockdown complet suite au bug v0.8.5 — 4 chemins à risque corrigés.** Le déclencheur commun : `/reload` **pendant** un combat (`PLAYER_LOGIN` fire alors avec `InCombatLockdown()` actif) :
   - La création des frames enregistrait le state driver de visibilité sans gate — bloqué, et le cache empoisonné empêchait toute réparation après combat (frames restées visibles avec données vides jusqu'au prochain reload hors combat). Le driver est maintenant différé au sortir de combat et les frames sont cachées en attendant.
