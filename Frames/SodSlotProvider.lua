@@ -110,6 +110,9 @@ end
 
 function provider:EventFilter(unit)
     if not unit then return nil end
+    -- Guard against secret-tagged unit args (12.1 UNIT_AURA payloads) —
+    -- comparing a secret to a string would error.
+    if (_G.issecretvalue or function() return false end)(unit) then return nil end
     for i, s in pairs(slots) do
         if s.unit == unit then return i end
     end

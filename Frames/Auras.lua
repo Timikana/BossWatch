@@ -165,7 +165,11 @@ local function collectAuras(unit, filter, source, maxCount)
         local ok, ids = pcall(GetUnitAuraInstanceIDs, unit, filter, 40, sortRule, 0)
         if ok and type(ids) == "table" then
             for _, instanceID in ipairs(ids) do
-                local data = GetAuraDataByAuraInstanceID(unit, instanceID)
+                -- 12.1: instance-ID aura reads THROW a Lua error while auras
+                -- are secret (they used to return secret-tagged fields).
+                -- pcall each read and stop cleanly on the first failure.
+                local okD, data = pcall(GetAuraDataByAuraInstanceID, unit, instanceID)
+                if not okD then break end
                 if data then
                     data._auraInstanceID = instanceID
                     if auraMatchesSource(data, source) then
@@ -182,8 +186,11 @@ local function collectAuras(unit, filter, source, maxCount)
     -- instance-ID API, or if the modern call fails).
     if C_UnitAuras and C_UnitAuras.GetAuraDataByIndex then
         for i = 1, 40 do
-            local data = C_UnitAuras.GetAuraDataByIndex(unit, i, filter)
-            if not data then break end
+            -- 12.1: index-based reads throw while auras are secret — and this
+            -- branch is exactly where Retail lands when the modern call above
+            -- failed. pcall keeps the failure silent.
+            local okD, data = pcall(C_UnitAuras.GetAuraDataByIndex, unit, i, filter)
+            if not okD or not data then break end
             data._auraIndex = i
             data._auraInstanceID = data.auraInstanceID
             if auraMatchesSource(data, source) then
