@@ -51,8 +51,12 @@ local provider = {
     -- For UNIT_* events: given the unit argument, return the slot index this
     -- event belongs to, or nil to ignore the event. Replaces the inline
     -- `unit:match("^boss%d$")` filter used previously.
+    -- 12.1: UNIT_AURA delivers a fully secret payload while auras are secret
+    -- — a string op or comparison on a secret unit arg would error, so gate
+    -- with issecretvalue first.
     EventFilter = function(self, unit)
         if not unit then return nil end
+        if (_G.issecretvalue or function() return false end)(unit) then return nil end
         local i = unit:match("^boss(%d)$")
         return i and tonumber(i) or nil
     end,

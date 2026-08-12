@@ -511,7 +511,9 @@ end
 local function _dumpAura(unit, i, filter)
     local data
     if C_UnitAuras and C_UnitAuras.GetAuraDataByIndex then
-        data = C_UnitAuras.GetAuraDataByIndex(unit, i, filter)
+        -- 12.1+: index-based aura reads throw while auras are secret.
+        local ok, d = pcall(C_UnitAuras.GetAuraDataByIndex, unit, i, filter)
+        data = ok and d or nil
     end
     if not data then
         local name, icon, count, _, duration, expiration, caster = UnitAura(unit, i, filter)

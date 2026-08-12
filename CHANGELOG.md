@@ -6,6 +6,12 @@ versionnage selon [SemVer](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+## [0.8.8] - 2026-08-12
+
+### Modifié
+- **Compatibilité patch WoW 12.1 "Midnight"** (Interface 120100 — plus d'avertissement "addon obsolète").
+- **Durcissement contre le nouveau régime d'auras secrètes de 12.1.** En 12.1, les APIs d'aura par index ou instance ID (`GetUnitAuraInstanceIDs`, `GetAuraDataByAuraInstanceID`, `GetAuraDataByIndex`) ne renvoient plus des champs secret-tagged : elles **lèvent une erreur Lua** quand les auras sont secrètes, et l'event `UNIT_AURA` livre un payload entièrement secret. Tous les sites de lecture sont maintenant enveloppés dans `pcall` avec arrêt propre (les icônes d'aura disparaissent proprement sur les boss aux auras secrètes au lieu de spammer des erreurs), et les filtres d'event sont gardés par `issecretvalue` avant toute opération sur l'argument unit. Les infobulles étaient déjà protégées. Aucun changement sur Classic / SoD / TBC / MoP.
+
 ## [0.8.7] - 2026-07-12
 
 ### Corrigé

@@ -10,6 +10,12 @@ versioning per [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.8.8] - 2026-08-12
+
+### Changed
+- **WoW patch 12.1 "Midnight" compatibility** (Interface 120100 — no more "out of date" warning).
+- **Hardened against 12.1's new secret-aura regime.** In 12.1, index- and instance-ID-based aura APIs (`GetUnitAuraInstanceIDs`, `GetAuraDataByAuraInstanceID`, `GetAuraDataByIndex`) no longer return secret-tagged fields: they **raise a Lua error** while auras are secret, and the `UNIT_AURA` event delivers a fully secret payload. Every read site is now wrapped in `pcall` with clean bail-out (aura icons cleanly disappear on secret-aura bosses instead of spamming errors), and event filters are guarded by `issecretvalue` before any operation on the unit argument. Tooltips were already protected. No change on Classic / SoD / TBC / MoP.
+
 ## [0.8.7] - 2026-07-12
 
 ### Fixed
