@@ -428,16 +428,19 @@ function AE.Apply(f, db)
         end
         f._acGroupAdded = true
         f._acFilter = filter
-    else
-        if c.SetAuraGroupMaxFrameCount then
-            pcall(c.SetAuraGroupMaxFrameCount, c, "main", maxCount)
-        end
-        if c.SetAuraGroupCandidateFilters then
-            pcall(c.SetAuraGroupCandidateFilters, c, "main", cf)
-        end
-        if c.SetAuraGroupLayout then
-            pcall(c.SetAuraGroupLayout, c, "main", buildGroupLayout(db))
-        end
+    end
+    -- Push count/filters/layout through the live setters on BOTH paths —
+    -- not just updates. Belt-and-braces against opts-key drift between
+    -- builds (observed: containers spawning Blizzard's default pool of 10
+    -- buttons despite maxFrameCount in the AddAuraGroup opts).
+    if c.SetAuraGroupMaxFrameCount then
+        pcall(c.SetAuraGroupMaxFrameCount, c, "main", maxCount)
+    end
+    if c.SetAuraGroupCandidateFilters then
+        pcall(c.SetAuraGroupCandidateFilters, c, "main", cf)
+    end
+    if c.SetAuraGroupLayout then
+        pcall(c.SetAuraGroupLayout, c, "main", buildGroupLayout(db))
     end
 
     -- Re-style buttons the container already spawned. Buttons are
