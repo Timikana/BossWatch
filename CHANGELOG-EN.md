@@ -10,6 +10,13 @@ versioning per [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.8.9] - 2026-08-29
+
+### Fixed
+- **Boss auras visible in combat again on Retail 12.1.** The v0.8.8 hardening made aura reads silent but **blind in combat** (empty row during pulls): 12.1 seals Lua aura reads in combat. New `Frames/AuraEngine.lua` architecture on the declarative AuraContainer model (production-validated on TankWatch v1.5.1): the addon creates and styles the buttons, Blizzard's secure code fills and animates them in combat, secrets included. The legacy scan stays in use on Classic clients (where it works) and for test mode.
+- **Bonus: the "Only mine" / "Hide mine" / "Boss-cast only" source filters are exact again on Retail** — they're now evaluated secure-side against the real aura data (`isFromPlayerOrPlayerPet`, `isBossAura`), where Lua reads had seen them secret-tagged since 12.0. The (!) warning marker disappears from the dropdown when the engine is active.
+- New debug command `/bossw acdebug` — per-frame engine state (supported, container active, button count).
+
 ## [0.8.8] - 2026-08-12
 
 ### Changed

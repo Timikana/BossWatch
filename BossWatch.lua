@@ -405,6 +405,16 @@ function BossW:ApplyFonts()
                     setF(a.timer,  size, auraOutline)
                 end
             end
+            -- AuraContainer engine texts (12.1+): our own FontStrings on
+            -- engine-owned buttons — SetFont on own regions is unprotected
+            -- and works mid-combat.
+            if f._acTexts then
+                local auraOutline = (outline == "" and "OUTLINE") or outline
+                for _, t in ipairs(f._acTexts) do
+                    setF(t.stacks, size, auraOutline)
+                    setF(t.timer,  size, auraOutline)
+                end
+            end
         end
     end
 end
@@ -481,6 +491,8 @@ SlashCmdList["BOSSWATCH"] = function(msg)
         ReloadUI()
     elseif cmd == "auras" then
         BossW:DumpAuras(arg ~= "" and arg or nil)
+    elseif cmd == "acdebug" then
+        if BossW.AuraEngine and BossW.AuraEngine.Debug then BossW.AuraEngine.Debug() end
     else
         local L = BossW.L
         print("|cffeda55fBossWatch:|r " .. L["commands:"])

@@ -582,8 +582,13 @@ local function UpdateFrame(frame)
         frame.raidTargetIcon:Hide()
     end
 
-    -- Auras
-    if BossW.UpdateAuras then BossW.UpdateAuras(frame) end
+    -- Auras — skip when the AuraContainer engine owns the row (it
+    -- self-updates; a legacy repaint would draw stale/empty icons over
+    -- the engine's buttons).
+    if BossW.UpdateAuras
+       and not (BossW.AuraEngine and BossW.AuraEngine.IsActive(frame)) then
+        BossW.UpdateAuras(frame)
+    end
 
     -- Target highlight border
     applyTargetHighlight(frame)
@@ -792,7 +797,17 @@ local function ApplyLayout()
         end
 
         if BossW.LayoutCastBar then BossW.LayoutCastBar(f, db) end
-        if BossW.LayoutAuras then BossW.LayoutAuras(f, db) end
+        -- Auras: on 12.1+ Retail, the declarative AuraContainer engine
+        -- owns the row (Blizzard fills/animates it in combat, secrets
+        -- included). Engine.Apply returns false on unsupported clients
+        -- and in test mode — the legacy painted path takes over there.
+        local engineOwns = BossW.AuraEngine and BossW.AuraEngine.Apply
+            and BossW.AuraEngine.Apply(f, db)
+        if engineOwns then
+            if f._auras then for _, b in ipairs(f._auras) do b:Hide() end end
+        elseif BossW.LayoutAuras then
+            BossW.LayoutAuras(f, db)
+        end
         if BossW._updateFrameBg then BossW._updateFrameBg(f) end
     end
 
