@@ -362,8 +362,14 @@ end
 local eventFrame = CreateFrame("Frame")
 eventFrame:RegisterEvent("UNIT_AURA")
 eventFrame:SetScript("OnEvent", function(_, event, unit)
+    -- ⚠ 12.1: never read the updateInfo payload (fully secret in combat).
+    -- Only the unit arg is used, behind the provider's issecretvalue gate.
     local idx = BossW.SlotProvider:EventFilter(unit)
     if not idx then return end
     local frame = BossW.BossFrames and BossW.BossFrames[idx]
-    if frame then BossW.UpdateAuras(frame) end
+    if not frame then return end
+    -- Engine-owned rows self-update — repainting over them would show
+    -- stale/empty legacy icons.
+    if BossW.AuraEngine and BossW.AuraEngine.IsActive(frame) then return end
+    BossW.UpdateAuras(frame)
 end)

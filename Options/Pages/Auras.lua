@@ -21,12 +21,13 @@ function O.Pages.auras(page)
         { text = L["Buffs (HELPFUL)"],   value = "HELPFUL" },
     }, 184, y), L["Which kind of auras to display: debuffs (HARMFUL) or buffs (HELPFUL)."])
     y = y - 56
-    -- On Retail Midnight 12.0+, Blizzard secret-tags isFromPlayerOrPlayerPet
-    -- and sourceUnit on hostile-unit auras, which makes the MINE / NOT_MINE
-    -- options unreliable. We don't disable the dropdown (the filter still
-    -- works for most cases via pcall fallback), but we suffix the affected
-    -- labels with ⚠ and put the Blizzard limitation in the tooltip.
+    -- On Retail Midnight 12.0, Blizzard secret-tags isFromPlayerOrPlayerPet
+    -- and sourceUnit on hostile-unit auras, which made MINE / NOT_MINE
+    -- unreliable. On 12.1+ the AuraContainer engine evaluates these filters
+    -- SECURE-SIDE against the real data, so they're exact again — only show
+    -- the (!) warning when the engine is NOT available (12.0 clients).
     local isRetailMidnight = (_G.WOW_PROJECT_ID == _G.WOW_PROJECT_MAINLINE)
+        and not (BossW.AuraEngine and BossW.AuraEngine.IsSupported())
     local labelMine    = L["Only mine"]
     local labelNotMine = L["Hide mine"]
     local sourceTip    = L["Filter by who applied the aura: anyone, only you, hide yours, or only boss-cast."]

@@ -33,6 +33,7 @@ Locales\ptBR.lua
 # "boss"..i themselves). On Vanilla/SoD, BossWatch-Vanilla.toc loads
 # Frames\SodSlotProvider.lua AFTER this to override the trivial provider.
 Frames\SlotProvider.lua
+Frames\AuraEngine.lua
 Frames\Boss.lua
 Frames\CastBar.lua
 Frames\Auras.lua
